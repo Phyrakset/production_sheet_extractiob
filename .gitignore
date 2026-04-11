@@ -3,3 +3,4 @@ dist
 .vite
 uploads
 .env
+test_data/
