@@ -1,51 +1,87 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const acceptedTypes = ".pdf,.png,.jpg,.jpeg,.webp";
+const documentSlots = [
+  { id: "page-01", title: "Sketch", accent: "teal" },
+  { id: "page-02", title: "Artwork", accent: "gold" },
+  { id: "page-03", title: "Materials", accent: "blue" },
+  { id: "page-04", title: "Labels", accent: "violet" },
+  { id: "page-05", title: "Packaging", accent: "rose" },
+  { id: "page-06", title: "Measure", accent: "cyan" },
+];
 
 export default function App() {
-  const [files, setFiles] = useState([]);
-  const [isDragging, setIsDragging] = useState(false);
+  const [slotFiles, setSlotFiles] = useState({});
+  const [slotResults, setSlotResults] = useState({});
+  const [activeSlotId, setActiveSlotId] = useState(documentSlots[0].id);
+  const [draggingSlotId, setDraggingSlotId] = useState("");
+  const [loadingSlotId, setLoadingSlotId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState(null);
-  const [sampleData, setSampleData] = useState(null);
+  const [health, setHealth] = useState(null);
 
   useEffect(() => {
-    fetch("/api/samples")
+    fetch("/api/health")
       .then((response) => response.json())
-      .then((data) => setSampleData(data))
+      .then((data) => setHealth(data))
       .catch(() => {
-        setSampleData(null);
+        setHealth(null);
       });
   }, []);
 
-  const handleSelect = (incomingFiles) => {
-    const nextFiles = Array.from(incomingFiles || []).filter((file) =>
+  const handleSelect = async (incomingFiles, slotId) => {
+    const nextFile = Array.from(incomingFiles || []).find((file) =>
       /\.(pdf|png|jpg|jpeg|webp)$/i.test(file.name)
     );
-    setFiles(nextFiles);
-    setError("");
-  };
-
-  const handleDrop = (event) => {
-    event.preventDefault();
-    setIsDragging(false);
-    handleSelect(event.dataTransfer.files);
-  };
-
-  const runExtraction = async () => {
-    if (!files.length) {
-      setError("Choose at least one PDF or image file.");
+    if (!nextFile) {
       return;
     }
 
-    setIsLoading(true);
+    const nextSlotFiles = {
+      ...slotFiles,
+      [slotId]: nextFile,
+    };
+
+    setSlotFiles(nextSlotFiles);
+    setActiveSlotId(slotId);
+    setLoadingSlotId(slotId);
     setError("");
-    setResult(null);
+
+    await runExtraction(slotId, nextFile);
+  };
+
+  const handleDrop = async (event, slotId) => {
+    event.preventDefault();
+    setDraggingSlotId("");
+    await handleSelect(event.dataTransfer.files, slotId);
+  };
+
+  const clearSlot = async (slotId) => {
+    const nextSlotFiles = { ...slotFiles };
+    const nextSlotResults = { ...slotResults };
+    delete nextSlotFiles[slotId];
+    delete nextSlotResults[slotId];
+
+    setSlotFiles(nextSlotFiles);
+    setSlotResults(nextSlotResults);
+    setActiveSlotId(slotId);
+    setError("");
+    setLoadingSlotId("");
+  };
+
+  const runExtraction = async (slotId, file) => {
+    const slot = documentSlots.find((item) => item.id === slotId);
+    if (!slot || !file) return;
+
+    setIsLoading(true);
+    setLoadingSlotId(slotId);
+    setError("");
 
     try {
       const formData = new FormData();
-      files.forEach((file) => formData.append("files", file));
+      formData.append("files", file, file.name);
+      formData.append("slotIds", slot.id);
+      formData.append("slotTitles", slot.title);
 
       const response = await fetch("/api/extract", {
         method: "POST",
@@ -57,13 +93,23 @@ export default function App() {
         throw new Error(data.error || "Extraction failed");
       }
 
-      setResult(data);
+      const pageResult = data.pages?.[0] || null;
+      if (pageResult) {
+        setSlotResults((current) => ({
+          ...current,
+          [slotId]: pageResult,
+        }));
+      }
     } catch (requestError) {
       setError(requestError.message);
     } finally {
       setIsLoading(false);
+      setLoadingSlotId("");
     }
   };
+
+  const activeResult = slotResults[activeSlotId] || null;
+  const displayJson = activeResult ? buildDisplayJson(activeResult) : null;
 
   return (
     <div className="app-shell">
@@ -73,21 +119,14 @@ export default function App() {
       <header className="hero">
         <div>
           <p className="eyebrow">Production Sheet Intelligence</p>
-          <h1>Production Document Extraction</h1>
-          <h2 className="hero-subtitle">
-            Convert PDF files and page images into standardized JSON for garment specs.
-          </h2>
-          <p className="hero-copy">
-            Built for technical packs, artwork sheets, construction notes, and
-            multi-page production documents. The extractor keeps normalized
-            master fields and page-level source values together.
-          </p>
+          <h1>Business Data Extracts</h1>
+          <h2 className="hero-subtitle">6-page extractor</h2>
         </div>
 
         <div className="status-card">
-          <span>Sample Test Directory</span>
-          <strong>{sampleData?.sampleDir || "D:\\TexLink\\Production_sheet\\test_data"}</strong>
-          <p>Use one PDF for full-document extraction or upload the six PNG pages as separate image inputs.</p>
+          <span>Status</span>
+          <strong>{health?.hasGeminiKey ? "Ready" : "Setup Needed"}</strong>
+          <p>PDF, PNG, JPG, WEBP</p>
         </div>
       </header>
 
@@ -95,94 +134,42 @@ export default function App() {
         <section className="panel uploader-panel">
           <div className="panel-heading">
             <div>
-              <h2>Input Documents</h2>
-              <p className="panel-subtitle">
-                Upload production sheets in either PDF format or image format.
-              </p>
+              <h2>Pages</h2>
             </div>
-            <span>{files.length} selected</span>
+            <span>{isLoading ? "extracting" : `${Object.keys(slotFiles).length}/6`}</span>
           </div>
 
-          <label
-            className={`dropzone ${isDragging ? "dragging" : ""}`}
-            onDragEnter={(event) => {
-              event.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragOver={(event) => event.preventDefault()}
-            onDragLeave={(event) => {
-              event.preventDefault();
-              setIsDragging(false);
-            }}
-            onDrop={handleDrop}
-          >
-            <input
-              type="file"
-              accept={acceptedTypes}
-              multiple
-              onChange={(event) => handleSelect(event.target.files)}
-            />
-            <div className="dropzone-content">
-              <span className="drop-badge">Supported Formats: PDF, PNG, JPG, WEBP</span>
-              <h3>Drag and Drop Documents</h3>
-              <p>Select one PDF file or multiple image files for extraction</p>
-            </div>
-          </label>
-
-          <div className="file-list">
-            {sampleData?.files?.length ? (
-              <div className="sample-stack">
-                <FormatGroup
-                  title="Sample PDF Files"
-                  subtitle="Recommended for combined document extraction"
-                  items={filterByFormat(sampleData.files, "pdf")}
-                  emptyMessage="No sample PDF files found."
-                  itemKey="path"
-                  valueGetter={(file) => file.name}
-                />
-                <FormatGroup
-                  title="Sample Image Files"
-                  subtitle="Useful for page-by-page extraction testing"
-                  items={filterByFormat(sampleData.files, "image")}
-                  emptyMessage="No sample image files found."
-                  itemKey="path"
-                  valueGetter={(file) => file.name}
-                />
-              </div>
-            ) : null}
-
-            {files.length ? (
-              <div className="sample-stack">
-                <FormatGroup
-                  title="Selected PDF Files"
-                  subtitle="Files ready for upload"
-                  items={filterByFormat(files, "pdf")}
-                  emptyMessage="No PDF files selected."
-                  itemKey="name"
-                  valueGetter={(file) => file.name}
-                  metaGetter={(file) => formatSize(file.size)}
-                />
-                <FormatGroup
-                  title="Selected Image Files"
-                  subtitle="Files ready for upload"
-                  items={filterByFormat(files, "image")}
-                  emptyMessage="No image files selected."
-                  itemKey="name"
-                  valueGetter={(file) => file.name}
-                  metaGetter={(file) => formatSize(file.size)}
-                />
-              </div>
-            ) : (
-              <div className="empty-state">
-                <strong>No input files selected</strong>
-                <p>Add a PDF or one or more images to begin extraction.</p>
-              </div>
-            )}
+          <div className="slot-list">
+            {documentSlots.map((slot, index) => (
+              <DocumentSlotCard
+                key={slot.id}
+                slot={slot}
+                index={index}
+                file={slotFiles[slot.id]}
+                isActive={slot.id === activeSlotId}
+                isDragging={slot.id === draggingSlotId}
+                isLoading={isLoading && loadingSlotId === slot.id}
+                onChoose={(event) => handleSelect(event.target.files, slot.id)}
+                onActivate={() => setActiveSlotId(slot.id)}
+                onDrop={(event) => handleDrop(event, slot.id)}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setDraggingSlotId(slot.id);
+                }}
+                onDragLeave={(event) => {
+                  event.preventDefault();
+                  if (draggingSlotId === slot.id) {
+                    setDraggingSlotId("");
+                  }
+                }}
+                onClear={() => clearSlot(slot.id)}
+              />
+            ))}
           </div>
 
-          <button className="primary-button" onClick={runExtraction} disabled={isLoading}>
-            {isLoading ? "Extracting..." : "Extract JSON"}
-          </button>
+          <div className="empty-state compact">
+            <strong>{isLoading ? "Extracting..." : documentSlots.find((slot) => slot.id === activeSlotId)?.title || "Page"}</strong>
+          </div>
 
           {error ? <div className="error-box">{error}</div> : null}
         </section>
@@ -190,44 +177,30 @@ export default function App() {
         <section className="panel result-panel">
           <div className="panel-heading">
             <div>
-              <h2>Extraction Results</h2>
-              <p className="panel-subtitle">
-                Review the merged profile summary and the standardized JSON response.
-              </p>
+              <h2>Extracts</h2>
             </div>
-            <span>{result ? `${result.totalFiles} files processed` : "waiting"}</span>
+            <span>{activeResult?.slotTitle || "waiting"}</span>
           </div>
 
-          {result ? (
+          {activeResult ? (
             <>
               <div className="section-header">
-                <h3>Master Profile Summary</h3>
-                <p>Normalized values merged from the uploaded document set.</p>
-              </div>
-              <div className="summary-grid">
-                {Object.entries(result.unifiedProfile.masterFields).map(([key, value]) => (
-                  <div className="summary-item" key={key}>
-                    <span>{toLabel(key)}</span>
-                    <strong>{renderValue(value)}</strong>
-                  </div>
-                ))}
-              </div>
-
-              <div className="section-header">
-                <h3>Standard JSON Output</h3>
-                <p>Full extraction payload including page-level fields and unified output.</p>
+                <h3>JSON</h3>
               </div>
               <div className="json-block">
-                <pre>{JSON.stringify(result, null, 2)}</pre>
+                <pre>{JSON.stringify(displayJson, null, 2)}</pre>
               </div>
             </>
           ) : (
-            <div className="result-placeholder">
-              <strong>Results will appear here</strong>
-              <p>
-                The extractor will show a master profile summary first, followed by the full
-                standardized JSON output.
-              </p>
+            <div className={`result-placeholder ${isLoading ? "loading" : ""}`}>
+              {isLoading ? (
+                <>
+                  <span className="loader" />
+                  <strong>Extracting...</strong>
+                </>
+              ) : (
+                <strong>No result for {documentSlots.find((slot) => slot.id === activeSlotId)?.title || "page"}</strong>
+              )}
             </div>
           )}
         </section>
@@ -236,59 +209,80 @@ export default function App() {
   );
 }
 
-function FormatGroup({
-  title,
-  subtitle,
-  items,
-  emptyMessage,
-  itemKey,
-  valueGetter,
-  metaGetter,
+function DocumentSlotCard({
+  slot,
+  index,
+  file,
+  isActive,
+  isDragging,
+  isLoading,
+  onChoose,
+  onActivate,
+  onDrop,
+  onDragEnter,
+  onDragLeave,
+  onClear,
 }) {
+  const inputRef = useRef(null);
+
   return (
-    <div className="sample-box">
-      <div className="group-heading">
-        <strong>{title}</strong>
-        <p>{subtitle}</p>
-      </div>
-      {items.length ? (
-        <div className="sample-list">
-          {items.map((item) => (
-            <div className="file-row" key={item[itemKey]}>
-              <div>
-                <strong>{valueGetter(item)}</strong>
-                {metaGetter ? <span>{metaGetter(item)}</span> : null}
-              </div>
-            </div>
-          ))}
+    <div className={`doc-slot accent-${slot.accent} ${isActive ? "active" : ""}`}>
+      <div className="doc-slot-header">
+        <div>
+          <span className="doc-slot-index">{index + 1}. {slot.title}</span>
         </div>
-      ) : (
-        <div className="group-empty">{emptyMessage}</div>
-      )}
+        {file ? (
+          <button type="button" className="slot-clear" onClick={onClear}>
+            x
+          </button>
+        ) : null}
+      </div>
+
+      <div
+        className={`doc-slot-drop ${isDragging ? "dragging" : ""} ${isLoading ? "loading" : ""}`}
+        onClick={onActivate}
+        onDoubleClick={() => inputRef.current?.click()}
+        onDragEnter={onDragEnter}
+        onDragOver={(event) => event.preventDefault()}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+      >
+        <input ref={inputRef} type="file" accept={acceptedTypes} onChange={onChoose} />
+        {isLoading ? (
+          <div className="doc-slot-content loading-state">
+            <span className="loader" />
+            <strong>Extracting</strong>
+            <span>{file?.name || "Uploading file"}</span>
+          </div>
+        ) : file ? (
+          <div className="doc-slot-content filled">
+            <strong>{file.name}</strong>
+            <span>{formatSize(file.size)}</span>
+            <small>{file.type || "file"}</small>
+          </div>
+        ) : (
+          <div className="doc-slot-content">
+            <strong>Drop File</strong>
+            <span>Double click to upload</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function filterByFormat(items, format) {
-  return (items || []).filter((item) => {
-    const name = item.name || "";
-    const isPdf = /\.pdf$/i.test(name);
-    return format === "pdf" ? isPdf : !isPdf;
-  });
-}
-
-function renderValue(value) {
-  if (Array.isArray(value)) {
-    return value.length ? value.join(", ") : "[]";
-  }
-  return value || "null";
-}
-
-function toLabel(value) {
-  return value
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (character) => character.toUpperCase())
-    .trim();
+function buildDisplayJson(pageResult) {
+  return {
+    slotTitle: pageResult.slotTitle,
+    fileName: pageResult.fileName,
+    pageType: pageResult.extraction?.pageType ?? null,
+    brand: pageResult.extraction?.brand ?? null,
+    pageRef: pageResult.extraction?.pageRef ?? null,
+    styleId: pageResult.extraction?.styleId ?? null,
+    summary: pageResult.extraction?.summary ?? null,
+    data: pageResult.extraction?.data ?? {},
+    warnings: pageResult.extraction?.warnings ?? [],
+  };
 }
 
 function formatSize(bytes) {
