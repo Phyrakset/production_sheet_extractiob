@@ -2,12 +2,34 @@ import { useEffect, useRef, useState } from "react";
 
 const acceptedTypes = ".pdf,.png,.jpg,.jpeg,.webp";
 const documentSlots = [
-  { id: "page-01", title: "Sketch", accent: "teal" },
-  { id: "page-02", title: "Artwork", accent: "gold" },
-  { id: "page-03", title: "Materials", accent: "blue" },
-  { id: "page-04", title: "Labels", accent: "violet" },
-  { id: "page-05", title: "Packaging", accent: "rose" },
-  { id: "page-06", title: "Measure", accent: "cyan" },
+  // Phase A - Order & Identity
+  { id: "page-01", title: "Cover Page", accent: "indigo", phase: "A" },
+  { id: "page-02", title: "Key Notes", accent: "crimson", phase: "A" },
+  { id: "page-03", title: "Order Details", accent: "orange", phase: "A" },
+  
+  // Phase B - Design & Construction
+  { id: "page-04", title: "Sketch", accent: "teal", phase: "B" },
+  { id: "page-05", title: "Construction", accent: "slate", phase: "B" },
+  { id: "page-06", title: "Mfg Standards", accent: "steel", phase: "B" },
+  { id: "page-07", title: "Colorways", accent: "amber", phase: "B" },
+  
+  // Phase C - Materials & BOM
+  { id: "page-08", title: "Materials", accent: "blue", phase: "C" },
+  { id: "page-09", title: "Trims", accent: "emerald", phase: "C" },
+  { id: "page-10", title: "Labels", accent: "violet", phase: "C" },
+  { id: "page-11", title: "Artwork", accent: "gold", phase: "C" },
+  
+  // Phase D - Measurement & Fit
+  { id: "page-12", title: "Measure", accent: "cyan", phase: "D" },
+  { id: "page-13", title: "Grading", accent: "sky", phase: "D" },
+  { id: "page-14", title: "Measure QA", accent: "mint", phase: "D" },
+  { id: "page-15", title: "HTM Guide", accent: "lime", phase: "D" },
+  
+  // Phase E - Quality & Shipping
+  { id: "page-16", title: "QA Standards", accent: "red", phase: "E" },
+  { id: "page-17", title: "Sample Comments", accent: "coral", phase: "E" },
+  { id: "page-18", title: "Fit Photos", accent: "magenta", phase: "E" },
+  { id: "page-19", title: "Packaging", accent: "rose", phase: "E" },
 ];
 
 export default function App() {
@@ -119,8 +141,8 @@ export default function App() {
       <header className="hero">
         <div>
           <p className="eyebrow">Production Sheet Intelligence</p>
-          <h1>Business Data Extracts</h1>
-          <h2 className="hero-subtitle">6-page extractor</h2>
+          <h1>Factory Tech Pack Extraction</h1>
+          <h2 className="hero-subtitle">19-Slot Phase Analysis</h2>
         </div>
 
         <div className="status-card">
@@ -136,34 +158,43 @@ export default function App() {
             <div>
               <h2>Pages</h2>
             </div>
-            <span>{isLoading ? "extracting" : `${Object.keys(slotFiles).length}/6`}</span>
+            <span>{isLoading ? "extracting" : `${Object.keys(slotFiles).length}/19`}</span>
           </div>
 
           <div className="slot-list">
-            {documentSlots.map((slot, index) => (
-              <DocumentSlotCard
-                key={slot.id}
-                slot={slot}
-                index={index}
-                file={slotFiles[slot.id]}
-                isActive={slot.id === activeSlotId}
-                isDragging={slot.id === draggingSlotId}
-                isLoading={isLoading && loadingSlotId === slot.id}
-                onChoose={(event) => handleSelect(event.target.files, slot.id)}
-                onActivate={() => setActiveSlotId(slot.id)}
-                onDrop={(event) => handleDrop(event, slot.id)}
-                onDragEnter={(event) => {
-                  event.preventDefault();
-                  setDraggingSlotId(slot.id);
-                }}
-                onDragLeave={(event) => {
-                  event.preventDefault();
-                  if (draggingSlotId === slot.id) {
-                    setDraggingSlotId("");
-                  }
-                }}
-                onClear={() => clearSlot(slot.id)}
-              />
+            {["A", "B", "C", "D", "E"].map((phase) => (
+              <div key={`phase-${phase}`} className="phase-group">
+                <div className="phase-header">
+                  Phase {phase}
+                </div>
+                {documentSlots
+                  .filter((slot) => slot.phase === phase)
+                  .map((slot, index) => (
+                    <DocumentSlotCard
+                      key={slot.id}
+                      slot={slot}
+                      index={index}
+                      file={slotFiles[slot.id]}
+                      isActive={slot.id === activeSlotId}
+                      isDragging={slot.id === draggingSlotId}
+                      isLoading={isLoading && loadingSlotId === slot.id}
+                      onChoose={(event) => handleSelect(event.target.files, slot.id)}
+                      onActivate={() => setActiveSlotId(slot.id)}
+                      onDrop={(event) => handleDrop(event, slot.id)}
+                      onDragEnter={(event) => {
+                        event.preventDefault();
+                        setDraggingSlotId(slot.id);
+                      }}
+                      onDragLeave={(event) => {
+                        event.preventDefault();
+                        if (draggingSlotId === slot.id) {
+                          setDraggingSlotId("");
+                        }
+                      }}
+                      onClear={() => clearSlot(slot.id)}
+                    />
+                  ))}
+              </div>
             ))}
           </div>
 

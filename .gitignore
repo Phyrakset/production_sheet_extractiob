@@ -4,3 +4,4 @@ dist
 uploads
 .env
 test_data/
+test_data_and_knowledge_base/

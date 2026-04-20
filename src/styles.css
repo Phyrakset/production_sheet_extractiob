@@ -145,7 +145,7 @@ input {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+  grid-template-columns: minmax(500px, 50%) minmax(0, 1fr);
   gap: 24px;
 }
 
@@ -190,9 +190,32 @@ input {
 }
 
 .slot-list {
-  display: grid;
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
   margin: 8px 0 18px;
+}
+
+.phase-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.phase-group > .doc-slot {
+  flex: 1 1 140px;
+  min-width: 140px;
+}
+
+.phase-header {
+  width: 100%;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .doc-slot {
@@ -333,6 +356,20 @@ input {
   border-color: rgba(92, 215, 255, 0.45);
   background: rgba(92, 215, 255, 0.06);
 }
+
+.accent-indigo .doc-slot-drop { border-color: rgba(99, 102, 241, 0.45); background: rgba(99, 102, 241, 0.06); }
+.accent-crimson .doc-slot-drop { border-color: rgba(220, 20, 60, 0.45); background: rgba(220, 20, 60, 0.06); }
+.accent-orange .doc-slot-drop { border-color: rgba(249, 115, 22, 0.45); background: rgba(249, 115, 22, 0.06); }
+.accent-slate .doc-slot-drop { border-color: rgba(100, 116, 139, 0.45); background: rgba(100, 116, 139, 0.06); }
+.accent-steel .doc-slot-drop { border-color: rgba(70, 130, 180, 0.45); background: rgba(70, 130, 180, 0.06); }
+.accent-amber .doc-slot-drop { border-color: rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.06); }
+.accent-emerald .doc-slot-drop { border-color: rgba(16, 185, 129, 0.45); background: rgba(16, 185, 129, 0.06); }
+.accent-sky .doc-slot-drop { border-color: rgba(14, 165, 233, 0.45); background: rgba(14, 165, 233, 0.06); }
+.accent-mint .doc-slot-drop { border-color: rgba(167, 243, 208, 0.45); background: rgba(167, 243, 208, 0.06); }
+.accent-lime .doc-slot-drop { border-color: rgba(132, 204, 22, 0.45); background: rgba(132, 204, 22, 0.06); }
+.accent-red .doc-slot-drop { border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.06); }
+.accent-coral .doc-slot-drop { border-color: rgba(255, 127, 80, 0.45); background: rgba(255, 127, 80, 0.06); }
+.accent-magenta .doc-slot-drop { border-color: rgba(217, 70, 239, 0.45); background: rgba(217, 70, 239, 0.06); }
 
 .empty-state,
 .summary-item,

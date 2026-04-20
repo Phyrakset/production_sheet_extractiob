@@ -13,7 +13,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 20 * 1024 * 1024,
-    files: 12,
+    files: 24,
   },
 });
 
@@ -54,7 +54,7 @@ app.get("/api/samples", async (_req, res) => {
   }
 });
 
-app.post("/api/extract", upload.array("files", 12), async (req, res) => {
+app.post("/api/extract", upload.array("files", 24), async (req, res) => {
   try {
     if (!GEMINI_API_KEY) {
       return res.status(500).json({
@@ -195,167 +195,108 @@ ${config.rules}
 function getSlotConfig(slotTitle) {
   const title = String(slotTitle || "").toLowerCase();
 
-  if (title === "sketch") {
-    return {
-      schema: `{
-    "pageLabel": "string or null",
-    "specRef": "string or null",
-    "pageNumberText": "string or null",
-    "garment": "string or null",
-    "canvasNote": "string or null",
-    "callouts": [
-      {
-        "text": "string or null",
-        "view": "front|back|both|unknown",
-        "target": "string or null",
-        "kind": "construction|measurement|note|unknown"
-      }
-    ],
-    "standaloneMarks": ["array of exact short marks like 3/8\\" or 1/2\\""]
-  }`,
-      rules: `- Focus on sketch/construction notes only.
-- Keep visible header items on this same page: brand, full page label, spec ref, page number text, and style ID.
-- Do not include extra business fields like department, season, target cost, retail price, or other repeated header fields unless the user can clearly see them and they are needed to understand the page.
-- Preserve every visible sketch annotation exactly as shown.
-- Include all long callouts such as seam, cuff, band, tack, and coverstitch notes in "callouts".
-- Include short standalone measurement marks such as 3/8" and 1/2" in "standaloneMarks".
-- Put the centered page note such as "ALL SEAMS MUST STRETCH" into "canvasNote".
-- If the page label reads "002 : Sketch TECHNICAL", keep the full wording rather than shortening it to just "TECHNICAL".
-- If the brand/logo reads "REITMANS", keep it exactly.
-- Do not merge different annotation blocks into one string if they appear separately on the page.`,
-    };
+  switch (title) {
+    case "cover page":
+      return {
+        schema: `{ "brand": "string", "styleNumber": "string", "season": "string", "designers": ["string"], "revisions": [{"date": "string", "comment": "string"}] }`,
+        rules: "- Focus on high-level style identity and revision history."
+      };
+    case "key notes":
+      return {
+        schema: `{ "notes": ["string"], "criticalWarnings": ["string"] }`,
+        rules: "- Extract critical production alerts, warnings, and Key Notes (注意大點)."
+      };
+    case "order details":
+      return {
+        schema: `{ "poNumber": "string", "deliveryDates": ["string"], "totalQuantity": "number", "breakdown": [{"color": "string", "size": "string", "quantity": "number"}] }`,
+        rules: "- Extract purchase order and quantity breakdowns."
+      };
+    case "sketch":
+      return {
+        schema: `{ "pageLabel": "string", "garment": "string", "callouts": [{"text": "string", "view": "front|back|both|unknown", "kind": "construction|measurement|note"}] }`,
+        rules: "- Focus on technical flat drawings and their direct callouts."
+      };
+    case "construction":
+      return {
+        schema: `{ "seams": [{"location": "string", "type": "string", "spi": "string"}], "instructions": ["string"] }`,
+        rules: "- Extract sewing sequences, edge finishes, and assembly steps."
+      };
+    case "mfg standards":
+      return {
+        schema: `{ "cutting": ["string"], "fusing": ["string"], "needle": ["string"] }`,
+        rules: "- Extract manufacturing standards for cutting, fusing, and stitching."
+      };
+    case "colorways":
+      return {
+        schema: `{ "colorways": [{"name": "string", "pantone": "string", "placement": "string"}] }`,
+        rules: "- Extract color mapping and pantone assignments."
+      };
+    case "materials":
+      return {
+        schema: `{ "materials": [{"part": "string", "material": "string", "supplier": "string", "color": "string", "comments": "string"}] }`,
+        rules: "- Focus on main fabrics, linings, and shell bulk materials."
+      };
+    case "trims":
+      return {
+        schema: `{ "trims": [{"part": "string", "description": "string", "color": "string", "quantity": "string", "supplier": "string"}] }`,
+        rules: "- Focus on hardware, zippers, buttons, threads, and elastics."
+      };
+    case "labels":
+      return {
+        schema: `{ "labels": [{"ticketType": "string", "supplier": "string", "quantity": "string", "comments": "string"}] }`,
+        rules: "- Focus on brand labels, care labels, and hangtags."
+      };
+    case "artwork":
+      return {
+        schema: `{ "artworkCode": "string", "texts": ["string"], "notes": ["string"] }`,
+        rules: "- Focus on prints, embroideries, placement instructions."
+      };
+    case "measure":
+      return {
+        schema: `{ "measurementSet": "string", "uom": "string", "points": [{"code": "string", "name": "string", "tolerance": "string", "xxs": "string", "xs": "string", "s": "string", "m": "string", "l": "string", "xl": "string"}] }`,
+        rules: "- Focus on the POM graded measurement charts."
+      };
+    case "grading":
+      return {
+        schema: `{ "rules": [{"dimension": "string", "increment": "string"}] }`,
+        rules: "- Extract grading increments and scaling rules."
+      };
+    case "measure qa":
+      return {
+        schema: `{ "tables": [{"pom": "string", "target": "string", "actual": "string", "difference": "string"}] }`,
+        rules: "- Extract QA measurement checks and filled forms."
+      };
+    case "htm guide":
+      return {
+        schema: `{ "instructions": [{"pom": "string", "howToMeasure": "string"}] }`,
+        rules: "- Extract visually described How-To-Measure guides."
+      };
+    case "qa standards":
+      return {
+        schema: `{ "aql": "string", "defectClassifications": [{"defect": "string", "severity": "string"}] }`,
+        rules: "- Extract Acceptable Quality Levels and defect standards."
+      };
+    case "sample comments":
+      return {
+        schema: `{ "sampleType": "string", "approvalStatus": "string", "comments": [{"area": "string", "feedback": "string"}] }`,
+        rules: "- Extract fit feedback and Pre-Production (PP) comments."
+      };
+    case "fit photos":
+      return {
+        schema: `{ "photos": [{"view": "string", "description": "string"}] }`,
+        rules: "- Describe actual garment photos or reference visual pictures."
+      };
+    case "packaging":
+      return {
+        schema: `{ "packaging": [{"material": "string", "part": "string", "supplier": "string", "comments": "string"}] }`,
+        rules: "- Focus on polybags, carton marks, and packing methods."
+      };
+    default:
+      return {
+        schema: `{ "content": {} }`,
+        rules: "- Extract general data that is specific to the visible page."
+      };
   }
-
-  if (title === "artwork") {
-    return {
-      schema: `{
-    "artworkCode": "string or null",
-    "texts": ["array of visible artwork text"],
-    "notes": ["array of placement or artwork notes"]
-  }`,
-      rules: `- Focus on artwork code, visible artwork wording, and artwork placement notes only.
-- Ignore repeated header/business metadata.`,
-    };
-  }
-
-  if (title === "materials") {
-    return {
-      schema: `{
-    "materials": [
-      {
-        "part": "string or null",
-        "material": "string or null",
-        "supplier": "string or null",
-        "articleNo": "string or null",
-        "materialType": "string or null",
-        "color": "string or null",
-        "status": "string or null",
-        "comments": "string or null"
-      }
-    ],
-    "trims": [
-      {
-        "part": "string or null",
-        "material": "string or null",
-        "supplier": "string or null",
-        "articleNo": "string or null",
-        "size": "string or null",
-        "quantity": "string or null",
-        "finish": "string or null",
-        "color": "string or null",
-        "status": "string or null",
-        "comments": "string or null"
-      }
-    ],
-    "processes": [
-      {
-        "material": "string or null",
-        "part": "string or null",
-        "supplier": "string or null",
-        "status": "string or null",
-        "comments": "string or null"
-      }
-    ]
-  }`,
-      rules: `- Focus only on BOM materials, trims, and processes tables.
-- Ignore repeated header/business metadata.`,
-    };
-  }
-
-  if (title === "labels") {
-    return {
-      schema: `{
-    "labels": [
-      {
-        "material": "string or null",
-        "part": "string or null",
-        "ticketType": "string or null",
-        "ticketCode": "string or null",
-        "supplier": "string or null",
-        "quantity": "string or null",
-        "status": "string or null",
-        "comments": "string or null",
-        "materialType": "string or null"
-      }
-    ]
-  }`,
-      rules: `- Focus only on the labels table rows.
-- Ignore repeated header/business metadata.`,
-    };
-  }
-
-  if (title === "packaging") {
-    return {
-      schema: `{
-    "packaging": [
-      {
-        "material": "string or null",
-        "part": "string or null",
-        "supplier": "string or null",
-        "status": "string or null",
-        "comments": "string or null"
-      }
-    ]
-  }`,
-      rules: `- Focus only on packaging rows.
-- Ignore repeated header/business metadata and ignore labels data unless it is part of packaging on this page.`,
-    };
-  }
-
-  if (title === "measure") {
-    return {
-      schema: `{
-    "measurementSet": "string or null",
-    "sampleSize": "string or null",
-    "uom": "string or null",
-    "notes": ["array of measurement notes"],
-    "points": [
-      {
-        "code": "string or null",
-        "name": "string or null",
-        "placementReference": "string or null",
-        "tolerance": "string or null",
-        "xxs": "string or null",
-        "xs": "string or null",
-        "s": "string or null",
-        "m": "string or null",
-        "l": "string or null",
-        "xl": "string or null",
-        "xxl": "string or null"
-      }
-    ]
-  }`,
-      rules: `- Focus only on measurement notes and measurement table rows.
-- Ignore repeated header/business metadata.`,
-    };
-  }
-
-  return {
-    schema: `{
-  "content": {}
-}`,
-    rules: `- Extract only data that is specific to the visible page.`,
-  };
 }
 
 function toArray(value) {
