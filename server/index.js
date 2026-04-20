@@ -19,6 +19,7 @@ const upload = multer({
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || "gemini-2.5-flash";
+const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash";
 
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
@@ -96,6 +97,114 @@ app.post("/api/extract", upload.array("files", 24), async (req, res) => {
     res.status(500).json({
       error: error.message || "Extraction failed",
     });
+  }
+});
+
+app.post("/api/merge", async (req, res) => {
+  try {
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY in .env" });
+    }
+
+    const { slotResults } = req.body;
+    if (!slotResults || Object.keys(slotResults).length === 0) {
+      return res.status(400).json({ error: "No extracted data provided" });
+    }
+
+    // Convert map to formatted JSON string
+    const inputDataStr = JSON.stringify(slotResults, null, 2);
+
+    const instruction = `
+You are a Master Production Planner. 
+Your task is to merge and synthesize the provided 19 fragments of JSON into ONE Final Production Sheet Master Template.
+Resolve any conflicting data intelligently (e.g. prioritize explicit DT Order values over sketching approximations).
+
+You MUST output ONLY valid JSON using the exact schema below representing the 9 distinct Rows of a professional Production Sheet:
+
+{
+  "row1_basicInfo": {
+    "styleNumber": "string|null",
+    "jobNumber": "string|null",
+    "poNumber": "string|null",
+    "orderQuantity": "number|null",
+    "colorBreakdown": [{"color": "string", "quantity": "number"}],
+    "sizeRatio": "string|null"
+  },
+  "row2_productionInstructions": {
+    "ppComments": ["string"],
+    "washingRequests": ["string"],
+    "printingWarnings": ["string"],
+    "tolerances": ["string"],
+    "overCutPercentage": "string|null"
+  },
+  "row4_sizeSpec": {
+    "measurements": [{"point": "string", "target": "string", "tolerance": "string"}]
+  },
+  "row5_packing": {
+    "foldingMethod": "string|null",
+    "cartonSizeLimits": "string|null",
+    "barcodeDetails": "string|null"
+  },
+  "row6_graphicPlacement": {
+    "logoType": "string|null",
+    "positionVertical": "string|null",
+    "positionHorizontal": "string|null",
+    "scalingRule": [{"size": "string", "scale": "string"}]
+  },
+  "row7_operationSequence": {
+    "sewingOperations": ["string"]
+  },
+  "row8_constructions": {
+    "stitchTypes": ["string"],
+    "seamFinishes": ["string"],
+    "bindingMethods": ["string"],
+    "specialNotes": ["string"]
+  },
+  "row9_threadConsumption": {
+    "totalPerGarment": "string|null",
+    "detailsBySeam": [{"seam": "string", "length": "string"}]
+  }
+}
+
+Here are the extracted documents:
+-------
+${inputDataStr}
+-------
+Return ONLY valid JSON without markdown fences.
+`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_TEXT_MODEL)}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          generationConfig: { temperature: 0.1, responseMimeType: "application/json" },
+          contents: [{ role: "user", parts: [{ text: instruction }] }],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(text);
+      throw new Error(`Gemini request failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    const rawText = result?.candidates?.[0]?.content?.parts?.map(part => part.text || "").join("") || "{}";
+    
+    let mergedJson;
+    try {
+      mergedJson = JSON.parse(rawText);
+    } catch {
+      mergedJson = { error: "Failed to parse AI output", raw: rawText };
+    }
+
+    res.json(mergedJson);
+  } catch (error) {
+    console.error("Merge error:", error);
+    res.status(500).json({ error: error.message || "Merge failed" });
   }
 });
 
@@ -196,100 +305,100 @@ function getSlotConfig(slotTitle) {
   const title = String(slotTitle || "").toLowerCase();
 
   switch (title) {
-    case "cover page":
+    case "dt order sheet":
       return {
-        schema: `{ "brand": "string", "styleNumber": "string", "season": "string", "designers": ["string"], "revisions": [{"date": "string", "comment": "string"}] }`,
-        rules: "- Focus on high-level style identity and revision history."
+        schema: `{ "jobNumber": "string", "poNumber": "string", "orderQuantity": "number", "colorBreakdown": [{"color": "string", "quantity": "number"}], "sizeRatio": "string" }`,
+        rules: "- Extract exactly from DT Order Sheet or initial Cover Page. Job Number is critical."
       };
-    case "key notes":
+    case "production notes":
       return {
-        schema: `{ "notes": ["string"], "criticalWarnings": ["string"] }`,
-        rules: "- Extract critical production alerts, warnings, and Key Notes (注意大點)."
+        schema: `{ "ppComments": ["string"], "washingRequests": ["string"], "printingWarnings": ["string"], "tolerances": ["string"], "overCutPercentage": "string" }`,
+        rules: "- Find any YM production notes, pre-production (PP) comments, and critical warnings."
       };
-    case "order details":
+    case "dt size spec":
       return {
-        schema: `{ "poNumber": "string", "deliveryDates": ["string"], "totalQuantity": "number", "breakdown": [{"color": "string", "size": "string", "quantity": "number"}] }`,
-        rules: "- Extract purchase order and quantity breakdowns."
+        schema: `{ "measurements": [{"point": "string", "target": "string", "tolerance": "string"}] }`,
+        rules: "- Extract size spec measurements (often from Report #799)."
       };
-    case "sketch":
+    case "technical sketch":
       return {
-        schema: `{ "pageLabel": "string", "garment": "string", "callouts": [{"text": "string", "view": "front|back|both|unknown", "kind": "construction|measurement|note"}] }`,
-        rules: "- Focus on technical flat drawings and their direct callouts."
+        schema: `{ "garment": "string", "callouts": [{"text": "string", "view": "string"}] }`,
+        rules: "- Focus on flat sketches and broad design callouts."
       };
-    case "construction":
+    case "graphic placement":
       return {
-        schema: `{ "seams": [{"location": "string", "type": "string", "spi": "string"}], "instructions": ["string"] }`,
-        rules: "- Extract sewing sequences, edge finishes, and assembly steps."
+        schema: `{ "logoType": "string", "positionVertical": "string", "positionHorizontal": "string", "scalingRule": [{"size": "string", "scale": "string"}] }`,
+        rules: "- Look for Graphic CADs, Placement POMs, Logo dimensions and scale rules."
       };
-    case "mfg standards":
+    case "artwork prints":
       return {
-        schema: `{ "cutting": ["string"], "fusing": ["string"], "needle": ["string"] }`,
-        rules: "- Extract manufacturing standards for cutting, fusing, and stitching."
+        schema: `{ "artworkCode": "string", "colors": ["string"], "notes": ["string"] }`,
+        rules: "- Look for print patterns, embroidery codes, and color distribution."
       };
-    case "colorways":
+    case "color & pantone":
       return {
         schema: `{ "colorways": [{"name": "string", "pantone": "string", "placement": "string"}] }`,
-        rules: "- Extract color mapping and pantone assignments."
+        rules: "- Identify all pantone values mapped to garment parts."
       };
-    case "materials":
+    case "fabric & materials":
       return {
-        schema: `{ "materials": [{"part": "string", "material": "string", "supplier": "string", "color": "string", "comments": "string"}] }`,
-        rules: "- Focus on main fabrics, linings, and shell bulk materials."
+        schema: `{ "materials": [{"part": "string", "material": "string", "content": "string"}] }`,
+        rules: "- Extract main fabric, lining, and shell BOM information."
       };
-    case "trims":
+    case "trims & hardware":
       return {
-        schema: `{ "trims": [{"part": "string", "description": "string", "color": "string", "quantity": "string", "supplier": "string"}] }`,
-        rules: "- Focus on hardware, zippers, buttons, threads, and elastics."
+        schema: `{ "trims": [{"part": "string", "description": "string", "quantity": "string"}] }`,
+        rules: "- Focus on zippers, buttons, elastics, drawcords."
       };
-    case "labels":
+    case "labels & tags":
       return {
-        schema: `{ "labels": [{"ticketType": "string", "supplier": "string", "quantity": "string", "comments": "string"}] }`,
-        rules: "- Focus on brand labels, care labels, and hangtags."
+        schema: `{ "labels": [{"ticketType": "string", "description": "string", "placement": "string"}] }`,
+        rules: "- Focus on brand label, care label, size tag, and hangtags."
       };
-    case "artwork":
+    case "thread consumption":
       return {
-        schema: `{ "artworkCode": "string", "texts": ["string"], "notes": ["string"] }`,
-        rules: "- Focus on prints, embroideries, placement instructions."
+        schema: `{ "totalPerGarment": "string", "detailsBySeam": [{"seam": "string", "length": "string"}] }`,
+        rules: "- Extract thread usage calculations (IE thread consumption sheet)."
       };
-    case "measure":
+    case "operation sequence":
       return {
-        schema: `{ "measurementSet": "string", "uom": "string", "points": [{"code": "string", "name": "string", "tolerance": "string", "xxs": "string", "xs": "string", "s": "string", "m": "string", "l": "string", "xl": "string"}] }`,
-        rules: "- Focus on the POM graded measurement charts."
+        schema: `{ "sewingOperations": ["string"] }`,
+        rules: "- Extract the step-by-step sewing order (Technical/IE operation flow)."
       };
-    case "grading":
+    case "construction rules":
+      return {
+        schema: `{ "stitchTypes": ["string"], "seamFinishes": ["string"], "bindingMethods": ["string"], "specialNotes": ["string"] }`,
+        rules: "- Look for tech pack detailed constructions. SPI, seam allowances, edge finishes."
+      };
+    case "grading rules":
       return {
         schema: `{ "rules": [{"dimension": "string", "increment": "string"}] }`,
-        rules: "- Extract grading increments and scaling rules."
+        rules: "- Extract scaling and grading rules."
       };
-    case "measure qa":
-      return {
-        schema: `{ "tables": [{"pom": "string", "target": "string", "actual": "string", "difference": "string"}] }`,
-        rules: "- Extract QA measurement checks and filled forms."
-      };
-    case "htm guide":
+    case "measurements guide":
       return {
         schema: `{ "instructions": [{"pom": "string", "howToMeasure": "string"}] }`,
-        rules: "- Extract visually described How-To-Measure guides."
+        rules: "- Extract HTM descriptions."
+      };
+    case "packing rules":
+      return {
+        schema: `{ "foldingMethod": "string", "polybagWarnings": "string", "cartonSizeLimits": "string" }`,
+        rules: "- Extract buyer compliance folding and packing instructions."
+      };
+    case "carton specs":
+      return {
+        schema: `{ "barcodeRules": "string", "stickerPlacement": "string", "cartonMarks": ["string"] }`,
+        rules: "- Extract barcodes, labels, and mark locations for boxes."
       };
     case "qa standards":
       return {
-        schema: `{ "aql": "string", "defectClassifications": [{"defect": "string", "severity": "string"}] }`,
-        rules: "- Extract Acceptable Quality Levels and defect standards."
-      };
-    case "sample comments":
-      return {
-        schema: `{ "sampleType": "string", "approvalStatus": "string", "comments": [{"area": "string", "feedback": "string"}] }`,
-        rules: "- Extract fit feedback and Pre-Production (PP) comments."
+        schema: `{ "aqlLevel": "string", "defectClassifications": [{"defect": "string", "severity": "string"}] }`,
+        rules: "- Focus on Acceptable Quality Level and inspection standards."
       };
     case "fit photos":
       return {
-        schema: `{ "photos": [{"view": "string", "description": "string"}] }`,
-        rules: "- Describe actual garment photos or reference visual pictures."
-      };
-    case "packaging":
-      return {
-        schema: `{ "packaging": [{"material": "string", "part": "string", "supplier": "string", "comments": "string"}] }`,
-        rules: "- Focus on polybags, carton marks, and packing methods."
+        schema: `{ "visualReferences": [{"view": "string", "description": "string"}] }`,
+        rules: "- Extract references to physical sample photos."
       };
     default:
       return {
