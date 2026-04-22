@@ -1106,6 +1106,10 @@ input {
   line-height: 1.2 !important;
 }
 
+.json-block pre {
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+}
 .doc-slot-content span, .doc-slot-content small {
   font-size: 0.65rem !important;
   line-height: 1.2 !important;
