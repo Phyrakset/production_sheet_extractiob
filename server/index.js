@@ -293,6 +293,7 @@ Return this exact structure:
   "styleId": "string or null",
   "summary": "short summary",
   "data": ${config.schema},
+  "otherInformation": ["array of ANY text, notes, callouts, or data found on the page that does not logically fit into the specific 'data' fields provided. DO NOT ignore any text!"],
   "warnings": ["array of issues or unreadable areas"]
 }
 
@@ -307,97 +308,97 @@ function getSlotConfig(slotTitle) {
   switch (title) {
     case "dt order sheet":
       return {
-        schema: `{ "jobNumber": "string", "poNumber": "string", "orderQuantity": "number", "colorBreakdown": [{"color": "string", "quantity": "number"}], "sizeRatio": "string" }`,
-        rules: "- Extract exactly from DT Order Sheet or initial Cover Page. Job Number is critical."
+        schema: `{ "factoryNumber": "string", "jobNumber": "string", "poNumber": "string", "orderQuantity": "number", "keyPoints": ["string"], "sampleRequirements": [{"sampleType": "string", "quantity": "string", "notes": "string"}], "colorBreakdown": [{"color": "string", "quantity": "number"}], "sizeBreakdown": [{"size": "string", "quantity": "number"}], "sizeRatio": "string", "approvalInfo": {"approvers": "string", "date": "string", "status": "string"} }`,
+        rules: "- Extract EVERYTHING from DT Order Sheet or initial Cover Page including all factory numbers, key attention points (大點), detailed size/quantity breakdowns, sample requirements, and approval stamps."
       };
     case "production notes":
       return {
-        schema: `{ "ppComments": ["string"], "washingRequests": ["string"], "printingWarnings": ["string"], "tolerances": ["string"], "overCutPercentage": "string" }`,
+        schema: `{ "generalInstructions": ["string"], "fabricNotes": ["string"], "packingNotes": ["string"], "qaNotes": ["string"], "revisions": ["string"] }`,
         rules: "- Find any YM production notes, pre-production (PP) comments, and critical warnings."
       };
     case "dt size spec":
       return {
-        schema: `{ "measurements": [{"point": "string", "target": "string", "tolerance": "string"}] }`,
+        schema: `{ "baseSize": "string", "sizeRange": "string", "toleranceRules": "string", "generalFitNotes": ["string"], "revisionDate": "string", "measurements": [{"point": "string", "target": "string", "tolerance": "string"}] }`,
         rules: "- Extract size spec measurements (often from Report #799)."
       };
     case "technical sketch":
       return {
-        schema: `{ "garment": "string", "callouts": [{"text": "string", "view": "string"}] }`,
+        schema: `{ "garment": "string", "generalDesignNotes": ["string"], "sketchRevisions": ["string"], "frontViewDetails": [{"text": "string"}], "backViewDetails": [{"text": "string"}], "interiorDetails": [{"text": "string"}], "callouts": [{"text": "string", "view": "string"}] }`,
         rules: "- Focus on flat sketches and broad design callouts."
       };
     case "graphic placement":
       return {
-        schema: `{ "logoType": "string", "positionVertical": "string", "positionHorizontal": "string", "scalingRule": [{"size": "string", "scale": "string"}] }`,
+        schema: `{ "logoType": "string", "applicationMethod": "string", "colorsUsed": ["string"], "placementDiagramNotes": ["string"], "positionVertical": "string", "positionHorizontal": "string", "scalingRule": [{"size": "string", "scale": "string"}] }`,
         rules: "- Look for Graphic CADs, Placement POMs, Logo dimensions and scale rules."
       };
     case "artwork prints":
       return {
-        schema: `{ "artworkCode": "string", "colors": ["string"], "notes": ["string"] }`,
+        schema: `{ "artworkCode": "string", "vendorName": "string", "printTechnique": "string", "repeatSize": "string", "strikeOffRequirements": "string", "colorPantones": ["string"], "notes": ["string"] }`,
         rules: "- Look for print patterns, embroidery codes, and color distribution."
       };
     case "color & pantone":
       return {
-        schema: `{ "colorways": [{"name": "string", "pantone": "string", "placement": "string"}] }`,
+        schema: `{ "season": "string", "colorStandards": ["string"], "comboBreakdowns": [{"part": "string", "colorway": "string"}], "colorways": [{"name": "string", "pantone": "string", "placement": "string"}] }`,
         rules: "- Identify all pantone values mapped to garment parts."
       };
     case "fabric & materials":
       return {
-        schema: `{ "materials": [{"part": "string", "material": "string", "content": "string"}] }`,
+        schema: `{ "materials": [{"part": "string", "material": "string", "content": "string", "supplier": "string", "weight": "string", "cutDirection": "string", "shrinkageTolerances": "string"}] }`,
         rules: "- Extract main fabric, lining, and shell BOM information."
       };
     case "trims & hardware":
       return {
-        schema: `{ "trims": [{"part": "string", "description": "string", "quantity": "string"}] }`,
+        schema: `{ "trims": [{"part": "string", "description": "string", "quantity": "string", "supplier": "string", "finish": "string", "dimensions": "string", "placementNotes": "string", "testingRequirements": "string"}] }`,
         rules: "- Focus on zippers, buttons, elastics, drawcords."
       };
     case "labels & tags":
       return {
-        schema: `{ "labels": [{"ticketType": "string", "description": "string", "placement": "string"}] }`,
+        schema: `{ "labels": [{"ticketType": "string", "description": "string", "placement": "string", "dimensions": "string", "material": "string", "attachmentMethod": "string", "variableDataFields": ["string"]}] }`,
         rules: "- Focus on brand label, care label, size tag, and hangtags."
       };
     case "thread consumption":
       return {
-        schema: `{ "totalPerGarment": "string", "detailsBySeam": [{"seam": "string", "length": "string"}] }`,
+        schema: `{ "totalPerGarment": "string", "totalGarmentYield": "string", "detailsBySeam": [{"seam": "string", "length": "string", "threadType": "string", "ticketNumber": "string", "coneSize": "string", "allowancePercentage": "string"}] }`,
         rules: "- Extract thread usage calculations (IE thread consumption sheet)."
       };
     case "operation sequence":
       return {
-        schema: `{ "sewingOperations": ["string"] }`,
+        schema: `{ "sewingOperations": [{"step": "string", "machineType": "string", "sam": "string", "operatorSkillLevel": "string", "folderNeeded": "string"}] }`,
         rules: "- Extract the step-by-step sewing order (Technical/IE operation flow)."
       };
     case "construction rules":
       return {
-        schema: `{ "stitchTypes": ["string"], "seamFinishes": ["string"], "bindingMethods": ["string"], "specialNotes": ["string"] }`,
+        schema: `{ "stitchTypes": ["string"], "seamFinishes": ["string"], "bindingMethods": ["string"], "specialNotes": ["string"], "spi": "string", "needleSpacing": "string", "threadTensionNotes": "string", "pressingInstructions": "string" }`,
         rules: "- Look for tech pack detailed constructions. SPI, seam allowances, edge finishes."
       };
     case "grading rules":
       return {
-        schema: `{ "rules": [{"dimension": "string", "increment": "string"}] }`,
+        schema: `{ "baseSize": "string", "sizeRange": "string", "gradingSystem": "string", "rules": [{"dimension": "string", "increment": "string", "gradeJumps": ["string"]}] }`,
         rules: "- Extract scaling and grading rules."
       };
     case "measurements guide":
       return {
-        schema: `{ "instructions": [{"pom": "string", "howToMeasure": "string"}] }`,
+        schema: `{ "diagramReferences": ["string"], "criticalPoints": ["string"], "instructions": [{"pom": "string", "howToMeasure": "string"}] }`,
         rules: "- Extract HTM descriptions."
       };
     case "packing rules":
       return {
-        schema: `{ "foldingMethod": "string", "polybagWarnings": "string", "cartonSizeLimits": "string" }`,
+        schema: `{ "foldingMethod": "string", "polybagWarnings": "string", "cartonSizeLimits": "string", "cartonDimensions": "string", "polybagSpecs": "string", "ratioPackingRules": "string", "innerBoxQty": "string" }`,
         rules: "- Extract buyer compliance folding and packing instructions."
       };
     case "carton specs":
       return {
-        schema: `{ "barcodeRules": "string", "stickerPlacement": "string", "cartonMarks": ["string"] }`,
+        schema: `{ "barcodeRules": "string", "stickerPlacement": "string", "cartonMarks": ["string"], "grossWeightLimit": "string", "netWeight": "string", "shippingMarks": "string", "boxQuality": "string" }`,
         rules: "- Extract barcodes, labels, and mark locations for boxes."
       };
     case "qa standards":
       return {
-        schema: `{ "aqlLevel": "string", "defectClassifications": [{"defect": "string", "severity": "string"}] }`,
+        schema: `{ "aqlLevel": "string", "inspectionMethod": "string", "testingProtocols": ["string"], "defectClassifications": [{"defect": "string", "severity": "string", "acceptableDefectLevels": "string"}] }`,
         rules: "- Focus on Acceptable Quality Level and inspection standards."
       };
     case "fit photos":
       return {
-        schema: `{ "visualReferences": [{"view": "string", "description": "string"}] }`,
+        schema: `{ "modelSize": "string", "fitComments": ["string"], "patternCorrections": ["string"], "sampleStatus": "string", "visualReferences": [{"view": "string", "description": "string"}] }`,
         rules: "- Extract references to physical sample photos."
       };
     default:
