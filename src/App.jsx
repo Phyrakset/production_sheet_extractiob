@@ -1,35 +1,43 @@
 import { useEffect, useRef, useState } from "react";
 
 const acceptedTypes = ".pdf,.png,.jpg,.jpeg,.webp";
+const phaseLabels = {
+  A: "A · 订单基础 Order & Identity",
+  B: "B · 设计工艺 Design & Construction",
+  C: "C · 物料 Materials & BOM",
+  D: "D · 量度 Measurement & Fit",
+  E: "E · 质量出货 Quality & Shipping",
+};
+
 const documentSlots = [
-  // Phase A - Order & Identity
-  { id: "page-01", title: "Cover Page", accent: "indigo", phase: "A" },
-  { id: "page-02", title: "Key Notes", accent: "crimson", phase: "A" },
-  { id: "page-03", title: "Order Details", accent: "orange", phase: "A" },
-  
-  // Phase B - Design & Construction
-  { id: "page-04", title: "Sketch", accent: "teal", phase: "B" },
-  { id: "page-05", title: "Construction", accent: "slate", phase: "B" },
-  { id: "page-06", title: "Mfg Standards", accent: "steel", phase: "B" },
-  { id: "page-07", title: "Colorways", accent: "amber", phase: "B" },
-  
-  // Phase C - Materials & BOM
-  { id: "page-08", title: "Materials", accent: "blue", phase: "C" },
-  { id: "page-09", title: "Trims", accent: "emerald", phase: "C" },
-  { id: "page-10", title: "Labels", accent: "violet", phase: "C" },
-  { id: "page-11", title: "Artwork", accent: "gold", phase: "C" },
-  
-  // Phase D - Measurement & Fit
-  { id: "page-12", title: "Measure", accent: "cyan", phase: "D" },
-  { id: "page-13", title: "Grading", accent: "sky", phase: "D" },
-  { id: "page-14", title: "Measure QA", accent: "mint", phase: "D" },
-  { id: "page-15", title: "HTM Guide", accent: "lime", phase: "D" },
-  
-  // Phase E - Quality & Shipping
-  { id: "page-16", title: "QA Standards", accent: "red", phase: "E" },
-  { id: "page-17", title: "Sample Comments", accent: "coral", phase: "E" },
-  { id: "page-18", title: "Fit Photos", accent: "magenta", phase: "E" },
-  { id: "page-19", title: "Packaging", accent: "rose", phase: "E" },
+  // Phase A — 订单基础 Order & Identity
+  { id: "page-01", title: "注意大點 Key Notes", accent: "crimson", phase: "A" },
+  { id: "page-02", title: "订单明细 Order Details", accent: "orange", phase: "A" },
+
+  // Phase B — 设计工艺 Design & Construction
+  { id: "page-03", title: "款式图 Tech Sketch", accent: "teal", phase: "B" },
+  { id: "page-04", title: "生产工艺 Construction", accent: "slate", phase: "B" },
+  { id: "page-05", title: "缝制标准 Mfg Standards", accent: "steel", phase: "B" },
+  { id: "page-06", title: "颜色 Colorways", accent: "amber", phase: "B" },
+
+  // Phase C — 物料 Materials & BOM
+  { id: "page-07", title: "面料物料 BOM Fabrics", accent: "blue", phase: "C" },
+  { id: "page-08", title: "辅料 BOM Trims", accent: "emerald", phase: "C" },
+  { id: "page-09", title: "唛头标签 Labels", accent: "violet", phase: "C" },
+  { id: "page-10", title: "印花绣花 Artwork", accent: "gold", phase: "C" },
+
+  // Phase D — 量度 Measurement & Fit
+  { id: "page-11", title: "成品尺寸 POMs", accent: "cyan", phase: "D" },
+  { id: "page-12", title: "放码规则 Grading", accent: "sky", phase: "D" },
+  { id: "page-13", title: "度尺图 HTM Guide", accent: "lime", phase: "D" },
+  { id: "page-14", title: "量度QA Measure QA", accent: "mint", phase: "D" },
+
+  // Phase E — 质量出货 Quality & Shipping
+  { id: "page-15", title: "PP办评语 PP Comments", accent: "coral", phase: "E" },
+  { id: "page-16", title: "实物照片 Fit Photos", accent: "magenta", phase: "E" },
+  { id: "page-17", title: "质量标准 QA Standards", accent: "red", phase: "E" },
+  { id: "page-18", title: "包装出货 Packaging", accent: "rose", phase: "E" },
+  { id: "page-19", title: "修改记录 Revision History", accent: "pewter", phase: "E" },
 ];
 
 export default function App() {
@@ -165,7 +173,7 @@ export default function App() {
             {["A", "B", "C", "D", "E"].map((phase) => (
               <div key={`phase-${phase}`} className="phase-group">
                 <div className="phase-header">
-                  Phase {phase}
+                  {phaseLabels[phase] || `Phase ${phase}`}
                 </div>
                 {documentSlots
                   .filter((slot) => slot.phase === phase)

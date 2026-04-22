@@ -370,6 +370,7 @@ input {
 .accent-red .doc-slot-drop { border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.06); }
 .accent-coral .doc-slot-drop { border-color: rgba(255, 127, 80, 0.45); background: rgba(255, 127, 80, 0.06); }
 .accent-magenta .doc-slot-drop { border-color: rgba(217, 70, 239, 0.45); background: rgba(217, 70, 239, 0.06); }
+.accent-pewter .doc-slot-drop { border-color: rgba(148, 163, 184, 0.45); background: rgba(148, 163, 184, 0.06); }
 
 .empty-state,
 .summary-item,
