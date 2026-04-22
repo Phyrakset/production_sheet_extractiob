@@ -3,42 +3,42 @@ import MasterDocument from "./MasterDocument";
 
 const acceptedTypes = ".pdf,.png,.jpg,.jpeg,.webp";
 const phaseLabels = {
-  A: "A · 订单基础 Order & Identity",
-  B: "B · 设计工艺 Design & Construction",
-  C: "C · 物料 Materials & BOM",
-  D: "D · 量度 Measurement & Fit",
-  E: "E · 质量出货 Quality & Shipping",
+  A: "A · Order & Identity",
+  B: "B · Design & Construction",
+  C: "C · Materials & BOM",
+  D: "D · Measurement & Fit",
+  E: "E · Quality & Shipping",
 };
 
 const documentSlots = [
-  // Phase A — 订单基础 Order & Identity
-  { id: "page-01", title: "注意大點 Key Notes", accent: "crimson", phase: "A" },
-  { id: "page-02", title: "订单明细 Order Details", accent: "orange", phase: "A" },
+  // Phase A — Order & Identity
+  { id: "page-01", title: "Key Notes", accent: "crimson", phase: "A" },
+  { id: "page-02", title: "Order Details", accent: "orange", phase: "A" },
 
-  // Phase B — 设计工艺 Design & Construction
-  { id: "page-03", title: "款式图 Tech Sketch", accent: "teal", phase: "B" },
-  { id: "page-04", title: "生产工艺 Construction", accent: "slate", phase: "B" },
-  { id: "page-05", title: "缝制标准 Mfg Standards", accent: "steel", phase: "B" },
-  { id: "page-06", title: "颜色 Colorways", accent: "amber", phase: "B" },
+  // Phase B — Design & Construction
+  { id: "page-03", title: "Tech Sketch", accent: "teal", phase: "B" },
+  { id: "page-04", title: "Construction", accent: "slate", phase: "B" },
+  { id: "page-05", title: "Mfg Standards", accent: "steel", phase: "B" },
+  { id: "page-06", title: "Colorways", accent: "amber", phase: "B" },
 
-  // Phase C — 物料 Materials & BOM
-  { id: "page-07", title: "面料物料 BOM Fabrics", accent: "blue", phase: "C" },
-  { id: "page-08", title: "辅料 BOM Trims", accent: "emerald", phase: "C" },
-  { id: "page-09", title: "唛头标签 Labels", accent: "violet", phase: "C" },
-  { id: "page-10", title: "印花绣花 Artwork", accent: "gold", phase: "C" },
+  // Phase C — Materials & BOM
+  { id: "page-07", title: "BOM Fabrics", accent: "blue", phase: "C" },
+  { id: "page-08", title: "BOM Trims", accent: "emerald", phase: "C" },
+  { id: "page-09", title: "Labels", accent: "violet", phase: "C" },
+  { id: "page-10", title: "Artwork", accent: "gold", phase: "C" },
 
-  // Phase D — 量度 Measurement & Fit
-  { id: "page-11", title: "成品尺寸 POMs", accent: "cyan", phase: "D" },
-  { id: "page-12", title: "放码规则 Grading", accent: "sky", phase: "D" },
-  { id: "page-13", title: "度尺图 HTM Guide", accent: "lime", phase: "D" },
-  { id: "page-14", title: "量度QA Measure QA", accent: "mint", phase: "D" },
+  // Phase D — Measurement & Fit
+  { id: "page-11", title: "POMs", accent: "cyan", phase: "D" },
+  { id: "page-12", title: "Grading", accent: "sky", phase: "D" },
+  { id: "page-13", title: "HTM Guide", accent: "lime", phase: "D" },
+  { id: "page-14", title: "Measure QA", accent: "mint", phase: "D" },
 
-  // Phase E — 质量出货 Quality & Shipping
-  { id: "page-15", title: "PP办评语 PP Comments", accent: "coral", phase: "E" },
-  { id: "page-16", title: "实物照片 Fit Photos", accent: "magenta", phase: "E" },
-  { id: "page-17", title: "质量标准 QA Standards", accent: "red", phase: "E" },
-  { id: "page-18", title: "包装出货 Packaging", accent: "rose", phase: "E" },
-  { id: "page-19", title: "修改记录 Revision History", accent: "pewter", phase: "E" },
+  // Phase E — Quality & Shipping
+  { id: "page-15", title: "PP Comments", accent: "coral", phase: "E" },
+  { id: "page-16", title: "Fit Photos", accent: "magenta", phase: "E" },
+  { id: "page-17", title: "QA Standards", accent: "red", phase: "E" },
+  { id: "page-18", title: "Packaging", accent: "rose", phase: "E" },
+  { id: "page-19", title: "Revision History", accent: "pewter", phase: "E" },
 ];
 
 const phaseTitles = {
@@ -70,6 +70,34 @@ export default function App() {
         setHealth(null);
       });
   }, []);
+
+  // Clipboard paste support: Win+Shift+S screenshot → Ctrl+V into active slot
+  useEffect(() => {
+    const handlePaste = async (event) => {
+      if (isLoading || isCompiling) return;
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          event.preventDefault();
+          const blob = item.getAsFile();
+          if (!blob) return;
+
+          const ext = blob.type.split("/")[1] || "png";
+          const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+          const fileName = `clipboard-${timestamp}.${ext}`;
+          const file = new File([blob], fileName, { type: blob.type });
+
+          await handleSelect([file], activeSlotId);
+          return;
+        }
+      }
+    };
+
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [activeSlotId, isLoading, isCompiling, slotFiles]);
 
   const handleSelect = async (incomingFiles, slotId) => {
     const nextFile = Array.from(incomingFiles || []).find((file) =>
@@ -376,7 +404,7 @@ function DocumentSlotCard({
         ) : (
           <div className="doc-slot-content">
             <strong>Drop File</strong>
-            <span>Double click to upload</span>
+            <span>Double-click or <kbd>Ctrl+V</kbd> to paste</span>
           </div>
         )}
       </div>

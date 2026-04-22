@@ -419,6 +419,25 @@ input {
 .accent-magenta .doc-slot-drop { border-color: rgba(217, 70, 239, 0.45); background: rgba(217, 70, 239, 0.06); }
 .accent-pewter .doc-slot-drop { border-color: rgba(148, 163, 184, 0.45); background: rgba(148, 163, 184, 0.06); }
 
+/* Kbd hint styling */
+.doc-slot-content kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-family: inherit;
+  color: var(--text-2);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 3px;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+/* Active slot paste indicator */
+.doc-slot.active .doc-slot-drop {
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.15);
+}
+
 .empty-state,
 .summary-item,
 .error-box,

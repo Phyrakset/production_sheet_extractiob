@@ -277,12 +277,14 @@ You are extracting data from one specific production sheet page.
 
 Current page type: "${slotTitle}".
 
-Important:
-- Extract only data relevant to the "${slotTitle}" page itself.
-- Keep visible page header data that is printed on this same page, such as brand/logo text, page label, spec ref, page number text, and style ID.
+CRITICAL RULES:
+- Extract EVERY piece of visible data on this page. Missing data = failure.
+- For tables: extract EVERY row and EVERY column cell. Never return an empty object {} for a table row.
+- For size columns (XXS, XS, S, M, L, XL, XXL, etc.): extract the number in each cell. If the cell has text instead of a number, extract the text. If a cell is blank, use null.
+- Keep visible page header data: brand/logo text, page label, spec ref, page number, style ID.
 - Do not return broad master-profile data from other page types.
 - If a value is not visible, use null for scalars and [] for arrays.
-- Preserve visible wording exactly as shown when practical.
+- Preserve visible wording exactly as shown (keep Chinese text as-is).
 - Return only valid JSON. Do not wrap in markdown fences.
 
 Return this exact structure:
@@ -293,7 +295,7 @@ Return this exact structure:
   "styleId": "string or null",
   "summary": "short summary",
   "data": ${config.schema},
-  "otherInformation": ["array of ANY text, notes, callouts, or data found on the page that does not logically fit into the specific 'data' fields provided. DO NOT ignore any text!"],
+  "otherInformation": ["array of ANY text, notes, callouts, stamps, or data found on the page that does not logically fit into the specific 'data' fields provided. DO NOT ignore any text!"],
   "warnings": ["array of issues or unreadable areas"]
 }
 
@@ -305,174 +307,236 @@ ${config.rules}
 function getSlotConfig(slotTitle) {
   const title = String(slotTitle || "").toLowerCase();
 
-  // --- Phase A: 订单基础 Order & Identity ---
-  if (title.includes("key notes") || title.includes("注意大點")) {
+  // --- Phase A: Order & Identity ---
+  if (title.includes("key notes")) {
     return {
-      schema: `{ "brand": "string", "styleNumber": "string", "factoryNumber": "string", "season": "string", "poNumber": "string", "totalQuantity": "number", "notes": ["string"], "criticalWarnings": ["string"], "colorSizeMatrix": [{"color": "string", "sizes": {}}] }`,
-      rules: `- This is the cover/summary page (注意大點). Extract brand, style#, factory#, PO#, total quantity.
-- Extract ALL numbered production notes/warnings.
-- Extract the color-size quantity breakdown table if visible.
-- Keep Chinese text exactly as shown.`
+      schema: `{
+  "brand": "string",
+  "customerName": "string",
+  "styleNumber": "string",
+  "factoryNumber": "string",
+  "season": "string",
+  "garmentType": "string",
+  "poNumber": "string",
+  "totalQuantity": "number",
+  "deliveryDate": "string",
+  "fabricType": "string",
+  "sketchDescription": "string",
+  "notes": ["string"],
+  "criticalWarnings": ["string"],
+  "colorSizeMatrix": [{
+    "color": "string",
+    "colorCode": "string",
+    "orderQuantity": "number",
+    "sizes": {
+      "XXS": "number or null",
+      "XS": "number or null",
+      "S": "number or null",
+      "M": "number or null",
+      "L": "number or null",
+      "XL": "number or null",
+      "XXL": "number or null",
+      "XXXL": "number or null"
+    },
+    "sizeNotes": "string"
+  }],
+  "sampleRequirements": [{
+    "style": "string",
+    "color": "string",
+    "quantity": "number",
+    "purpose": "string"
+  }],
+  "approvalStamp": {
+    "status": "string",
+    "approvedBy": "string",
+    "approvalDate": "string"
+  }
+}`,
+      rules: `- This is the cover/summary page (注意大點). Extract ALL header fields: brand, customer, style#, factory# (廠號), PO#, total qty (數量), delivery date, garment type, fabric type.
+- Extract ALL numbered production notes/warnings exactly as written (Chinese+English).
+- CRITICAL: Extract the color-size quantity breakdown table (款號/STYLE 中查明细表). For EACH row extract the color name, color code, order quantity (订单数), and the quantity value for EVERY size column (XXS, XS, S, M, L, XL, XXL). If a size cell contains text notes instead of a number, put the text in "sizeNotes". Do NOT return empty sizes — extract every cell value.
+- Extract the sample requirement table (大货需加裁抽办数量) with style, color, quantity, and purpose (用途).
+- Extract the approval stamp (允許開裁): status, approved by, date.
+- Describe the sketch visible on this page (front/back views).`
     };
   }
-  if (title.includes("order details") || title.includes("订单明细")) {
+  if (title.includes("order details")) {
     return {
-      schema: `{ "poNumber": "string", "deliveryDates": ["string"], "totalQuantity": "number", "shipmentLots": [{"lot": "string", "quantity": "number", "date": "string"}], "breakdown": [{"color": "string", "size": "string", "quantity": "number"}], "processes": ["string"] }`,
-      rules: `- Extract purchase order numbers, quantities, size/color breakdown.
-- Extract shipment lot details (lot number, quantity, date).
-- Extract process summary items (e.g., Print, Wash, Heat Transfer).`
-    };
-  }
-
-  // --- Phase B: 设计工艺 Design & Construction ---
-  if (title.includes("tech sketch") || title.includes("款式图")) {
-    return {
-      schema: `{ "pageLabel": "string", "garment": "string", "callouts": [{"text": "string", "view": "front|back|both|unknown", "kind": "construction|measurement|note"}], "measurementPoints": ["string"] }`,
-      rules: `- Focus on technical flat drawings and their direct callouts.
-- Extract all annotation text pointing to specific garment areas.
-- Note measurement reference points if shown (e.g., 度尺图 markers).`
-    };
-  }
-  if (title.includes("construction") || title.includes("生产工艺")) {
-    return {
-      schema: `{ "operations": [{"step": "number", "description": "string", "machineType": "string", "qualityNote": "string"}], "seams": [{"location": "string", "type": "string", "spi": "string"}], "instructions": ["string"] }`,
-      rules: `- Extract sewing operation lists (工序表/工艺单), machine types, quality requirements.
-- Extract workmanship instructions and production process steps.
-- Include label placement and assembly sequence details.`
-    };
-  }
-  if (title.includes("mfg standards") || title.includes("缝制标准")) {
-    return {
-      schema: `{ "cutting": ["string"], "fusing": ["string"], "needle": ["string"], "stitching": ["string"], "pressing": ["string"], "finishing": ["string"], "minimumStandards": ["string"] }`,
-      rules: `- Extract manufacturing standards for cutting, fusing, needle specs.
-- Include MFTG Standards items: construction details, labeling requirements, pressing, finishing.
-- Extract CUT/SEW KNIT TOPS MINIMUM STANDARDS if present.`
-    };
-  }
-  if (title.includes("colorways") || title.includes("颜色")) {
-    return {
-      schema: `{ "colorways": [{"name": "string", "code": "string", "pantone": "string", "placement": "string", "washType": "string"}], "colorMatchPhotos": ["string"] }`,
-      rules: `- Extract color mapping, Pantone codes, and colorway assignments.
-- Include wash/treatment details per colorway (e.g., No-Stress GD, Medium Blue).
-- Note any color matching approval photos or PPS stripe matching info.`
-    };
-  }
-
-  // --- Phase C: 物料 Materials & BOM ---
-  if (title.includes("bom fabrics") || title.includes("面料物料")) {
-    return {
-      schema: `{ "materials": [{"part": "string", "material": "string", "composition": "string", "weight": "string", "supplier": "string", "color": "string", "comments": "string"}] }`,
-      rules: `- Focus on main fabrics, linings, interlining, rib materials, yarn.
-- Extract from BOM/Multi-level Placements/Style BOM Template sections.
-- Include composition, weight, and supplier details.`
-    };
-  }
-  if (title.includes("bom trims") || title.includes("辅料")) {
-    return {
-      schema: `{ "trims": [{"part": "string", "description": "string", "color": "string", "quantity": "string", "supplier": "string"}], "threads": [{"type": "string", "color": "string", "code": "string"}] }`,
-      rules: `- Focus on hardware, zippers, buttons, elastic, thread, sewing materials.
-- Separate thread details into their own array if present.
-- Include packaging materials only if they appear in the trims BOM section.`
-    };
-  }
-  if (title.includes("labels") || title.includes("唛头标签")) {
-    return {
-      schema: `{ "labels": [{"ticketType": "string", "description": "string", "placement": "string", "supplier": "string", "quantity": "string", "comments": "string"}], "hangtags": [{"type": "string", "description": "string"}] }`,
-      rules: `- Focus on brand labels, care labels, size labels, content labels, hangtags, heat transfers.
-- Extract placement instructions (e.g., center back neck, side seam).
-- Include label details from Tech Pack Placements sections.`
-    };
-  }
-  if (title.includes("artwork") || title.includes("印花绣花")) {
-    return {
-      schema: `{ "artworkCode": "string", "type": "print|embroidery|heat_transfer|other", "placement": "string", "dimensions": {"width": "string", "height": "string"}, "colors": ["string"], "notes": ["string"], "approvalStatus": "string" }`,
-      rules: `- Focus on prints, embroideries, graphic placement, heat transfer specs.
-- Extract artwork dimensions, placement measurements, color codes.
-- Include 3D render descriptions or placement diagram details.`
+      schema: `{ "customerName": "string", "factoryName": "string", "poNumber": "string", "styleNumber": "string", "deliveryDates": ["string"], "totalQuantity": "number", "shipmentLots": [{"lot": "string", "color": "string", "quantity": "number", "date": "string", "destination": "string"}], "colorSizeBreakdown": [{"color": "string", "colorCode": "string", "sizeQuantities": {}}], "processes": [{"name": "string", "details": "string"}], "fabricInfo": "string", "washType": "string" }`,
+      rules: `- Extract ALL header fields: customer, factory, PO#, style#.
+- Extract every shipment lot row with lot number, color, qty, date, destination.
+- Extract full color×size quantity table preserving all columns.
+- Extract process summary (Print, Wash, Heat Transfer, etc.) with details.`
     };
   }
 
-  // --- Phase D: 量度 Measurement & Fit ---
-  if (title.includes("poms") || title.includes("成品尺寸")) {
+  // --- Phase B: Design & Construction ---
+  if (title.includes("tech sketch")) {
     return {
-      schema: `{ "measurementSet": "string", "uom": "cm|inch", "tolerancePlus": "string", "toleranceMinus": "string", "points": [{"code": "string", "name": "string", "tolerance": "string", "xxs": "string", "xs": "string", "s": "string", "m": "string", "l": "string", "xl": "string", "xxl": "string", "xxxl": "string"}] }`,
-      rules: `- Extract the POM graded measurement spec sheet (成品尺寸/成品规格表).
-- Include all size columns present in the document.
-- Extract tolerance values per measurement point.`
+      schema: `{ "pageLabel": "string", "garment": "string", "views": [{"view": "front|back|side|detail", "description": "string"}], "callouts": [{"text": "string", "view": "front|back|both|unknown", "kind": "construction|measurement|note", "location": "string"}], "measurementPoints": [{"code": "string", "name": "string", "position": "string"}], "constructionNotes": ["string"] }`,
+      rules: `- Extract ALL text annotations, callouts, and labels on the technical drawing.
+- For each callout note which view (front/back) and where on garment it points.
+- Extract measurement point codes and names if shown on the sketch.
+- Extract any construction notes written near the drawings.`
     };
   }
-  if (title.includes("grading") || title.includes("放码规则")) {
+  if (title.includes("construction")) {
     return {
-      schema: `{ "approvalStatus": "string", "baseSize": "string", "rules": [{"code": "string", "dimension": "string", "increment": "string", "unit": "string"}] }`,
-      rules: `- Extract grading increments and size scaling rules.
-- Note grading approval status (e.g., "GRADING APPROVED").
-- Include base size and incremental values between sizes.`
+      schema: `{ "operations": [{"step": "number", "description": "string", "machineType": "string", "needleType": "string", "threadType": "string", "spiStitch": "string", "qualityNote": "string"}], "seams": [{"location": "string", "type": "string", "spi": "string", "width": "string"}], "washInstructions": [{"step": "string", "details": "string"}], "labelPlacement": [{"labelType": "string", "position": "string", "method": "string"}], "instructions": ["string"], "attentionPoints": ["string"] }`,
+      rules: `- Extract full sewing operation table (工序表/工艺单): step#, description, machine, needle, thread, SPI.
+- Extract ALL workmanship instructions and 大货注意 attention points.
+- Extract wash/finishing process steps if on this page.
+- Extract label placement instructions (which label goes where, attach method).`
     };
   }
-  if (title.includes("htm guide") || title.includes("度尺图")) {
+  if (title.includes("mfg standards")) {
     return {
-      schema: `{ "instructions": [{"code": "string", "name": "string", "howToMeasure": "string", "diagramDescription": "string"}] }`,
-      rules: `- Extract How-To-Measure (度尺图) visual measurement guides.
-- Describe each measurement point and how to measure it.
-- Include measurement point codes if shown (e.g., 1000, 1125, 1300).`
+      schema: `{ "cutting": [{"item": "string", "standard": "string"}], "fusing": [{"item": "string", "standard": "string"}], "needle": [{"area": "string", "needleType": "string", "size": "string"}], "stitching": [{"seam": "string", "stitchType": "string", "spi": "string", "width": "string"}], "pressing": [{"item": "string", "standard": "string"}], "finishing": [{"item": "string", "standard": "string"}], "labeling": [{"item": "string", "requirement": "string"}], "minimumStandards": ["string"], "constructionDiagrams": [{"area": "string", "description": "string"}] }`,
+      rules: `- Extract ALL MFTG Standards rows as structured items with standard descriptions.
+- Include construction diagrams descriptions (hood, pocket, hem, etc.).
+- Extract CUT/SEW KNIT TOPS MINIMUM STANDARDS table items.
+- Extract labeling requirements, pressing specs, finishing standards.`
     };
   }
-  if (title.includes("measure qa") || title.includes("量度qa")) {
+  if (title.includes("colorways")) {
     return {
-      schema: `{ "sampleSize": "string", "tables": [{"pom": "string", "code": "string", "target": "string", "actual": "string", "difference": "string", "pass": "boolean"}] }`,
-      rules: `- Extract QA measurement evaluation tables.
-- Include target vs actual measurements and pass/fail status.
-- Note sample size being measured.`
+      schema: `{ "colorways": [{"name": "string", "code": "string", "pantone": "string", "placement": "string", "washType": "string", "fabricColor": "string"}], "colorMatchPhotos": [{"description": "string", "approvalNote": "string"}], "bomPerColorway": [{"colorway": "string", "materials": [{"item": "string", "color": "string", "code": "string"}]}] }`,
+      rules: `- Extract ALL colorway entries with name, code, Pantone, wash type, fabric color.
+- Extract color matching photo descriptions and approval notes (e.g., "All accept for bulk").
+- If BOM items are listed per colorway (like in PTBC0047), extract them under bomPerColorway.`
     };
   }
 
-  // --- Phase E: 质量出货 Quality & Shipping ---
-  if (title.includes("pp comments") || title.includes("pp办评语")) {
+  // --- Phase C: Materials & BOM ---
+  if (title.includes("bom fabrics")) {
     return {
-      schema: `{ "sampleType": "string", "submissionDate": "string", "approvalStatus": "string", "comments": [{"area": "string", "feedback": "string", "action": "string"}], "bulkNotes": ["string"] }`,
-      rules: `- Extract PP sample review comments (PP办评语).
-- Include approval status (APPROVED/REJECTED/CONDITIONAL).
-- Extract area-specific feedback with required actions.
-- Include 大货注意 (bulk production notes) if present.`
+      schema: `{ "materials": [{"category": "string", "part": "string", "material": "string", "composition": "string", "weight": "string", "width": "string", "color": "string", "colorCode": "string", "supplier": "string", "supplierCode": "string", "quantity": "string", "unitPrice": "string", "comments": "string"}] }`,
+      rules: `- Extract EVERY row from fabric BOM tables: category (shell/lining/rib/interlining), part, material name, composition, weight, width, color, supplier, qty.
+- Include supplier codes and unit prices if visible.
+- Extract from BOM/Multi-level Placements/Style BOM Template/用料清單 sections.`
     };
   }
-  if (title.includes("fit photos") || title.includes("实物照片")) {
+  if (title.includes("bom trims")) {
     return {
-      schema: `{ "photos": [{"view": "front|back|side|detail|unknown", "description": "string", "comments": "string"}], "garmentOnForm": "boolean" }`,
-      rules: `- Describe actual garment photos or reference visual pictures (样衣图).
-- Note if garment is shown on mannequin/form or flat.
-- Include any fit comments or construction detail photos.`
+      schema: `{ "trims": [{"category": "string", "part": "string", "description": "string", "size": "string", "color": "string", "colorCode": "string", "quantity": "string", "unit": "string", "supplier": "string", "supplierCode": "string", "comments": "string"}], "threads": [{"type": "string", "color": "string", "colorCode": "string", "ticketNumber": "string", "usage": "string"}], "packingMaterials": [{"item": "string", "size": "string", "quantity": "string", "supplier": "string"}] }`,
+      rules: `- Extract EVERY row from trims BOM: zippers, buttons, elastic, drawcord, rivets, etc.
+- Separate thread details (type, color, ticket#, usage area).
+- Separate packing materials (polybag, tissue, hanger, etc.) if listed in same BOM.
+- Include all supplier codes, sizes, and color codes.`
     };
   }
-  if (title.includes("qa standards") || title.includes("质量标准")) {
+  if (title.includes("labels")) {
     return {
-      schema: `{ "aql": "string", "inspectionLevel": "string", "defectClassifications": [{"defect": "string", "severity": "critical|major|minor"}], "standards": ["string"] }`,
-      rules: `- Extract Acceptable Quality Levels and inspection standards.
-- Include defect classification details.
-- Extract finishing and QC standards from MFTG Standards sections.`
+      schema: `{ "labels": [{"ticketType": "string", "description": "string", "content": "string", "placement": "string", "attachMethod": "string", "material": "string", "size": "string", "supplier": "string", "quantity": "string", "perUnit": "string", "comments": "string"}], "hangtags": [{"type": "string", "description": "string", "material": "string", "supplier": "string"}], "heatTransfers": [{"type": "string", "position": "string", "size": "string", "color": "string"}] }`,
+      rules: `- Extract EVERY label entry: brand label, care label, size label, content label, country-of-origin, UPC.
+- Include placement (center back neck, side seam, etc.) and attach method (sewn, HT).
+- Extract hangtag and heat transfer details separately.
+- Include per-unit quantities and label content text if readable.`
     };
   }
-  if (title.includes("packaging") || title.includes("包装出货")) {
+  if (title.includes("artwork")) {
     return {
-      schema: `{ "foldingMethod": "string", "polybag": "string", "cartonMark": "string", "packingInstructions": ["string"], "shipmentDetails": [{"destination": "string", "quantity": "number"}], "barcodes": ["string"] }`,
-      rules: `- Extract packing method, folding instructions, polybag specs.
-- Include carton mark layout, barcode placement.
-- Extract shipment details, destination, quantities per color/size.`
+      schema: `{ "artworks": [{"artworkCode": "string", "type": "print|embroidery|heat_transfer|other", "placement": "string", "position": {"fromTop": "string", "fromCenter": "string", "fromEdge": "string"}, "dimensions": {"width": "string", "height": "string"}, "colors": [{"name": "string", "code": "string", "thread": "string"}], "stitchCount": "string", "stitchType": "string"}], "renderDescriptions": ["string"], "approvalStatus": "string", "notes": ["string"] }`,
+      rules: `- Extract ALL artwork entries with code, type, exact placement measurements.
+- For embroidery: include stitch count, stitch type, thread colors with codes.
+- For prints: include ink colors, print method, dimensions.
+- Describe 3D renders or placement diagrams visible on the page.`
     };
   }
-  if (title.includes("revision history") || title.includes("修改记录")) {
+
+  // --- Phase D: Measurement & Fit ---
+  if (title.includes("poms")) {
     return {
-      schema: `{ "revisions": [{"date": "string", "version": "string", "description": "string", "changedBy": "string"}], "carryoverNote": "string" }`,
-      rules: `- Extract change log entries with dates and descriptions.
-- Include version numbers and who made each change.
-- Note any carryover/reorder style notes.`
+      schema: `{ "measurementSet": "string", "uom": "cm|inch", "sampleSize": "string", "tolerancePlus": "string", "toleranceMinus": "string", "points": [{"code": "string", "name": "string", "tolerance": "string", "3xs": "string", "2xs": "string", "xxs": "string", "xs": "string", "s": "string", "m": "string", "l": "string", "xl": "string", "xxl": "string", "2xl": "string", "xxxl": "string", "3xl": "string"}] }`,
+      rules: `- Extract EVERY row from the POM/size spec table (成品尺寸/成品规格表).
+- Include ALL size columns that exist in the document (3XS through 3XL).
+- Use null for sizes that don't exist in this document.
+- Extract tolerance values (+ and -) per measurement point.
+- Include measurement point codes (e.g., 1000, 1110, 1300) if visible.`
+    };
+  }
+  if (title.includes("grading")) {
+    return {
+      schema: `{ "approvalStatus": "string", "approvalDate": "string", "baseSize": "string", "sizeRange": ["string"], "rules": [{"code": "string", "dimension": "string", "baseValue": "string", "increments": [{"fromSize": "string", "toSize": "string", "increment": "string"}], "unit": "string"}] }`,
+      rules: `- Extract grading approval status and date (e.g., "GRADING APPROVED").
+- Extract base size and full size range.
+- For each dimension extract the base value and increments between each size jump.
+- Include measurement codes if visible.`
+    };
+  }
+  if (title.includes("htm guide")) {
+    return {
+      schema: `{ "garmentType": "string", "instructions": [{"code": "string", "name": "string", "howToMeasure": "string", "startPoint": "string", "endPoint": "string", "diagramDescription": "string", "specialNotes": "string"}], "generalCriteria": ["string"] }`,
+      rules: `- Extract EVERY measurement point from HTM/度尺图 diagrams.
+- For each point describe: where to start measuring, where to end, how to position garment.
+- Include general measurement criteria (e.g., "measure garment laid flat", "HPS definition").
+- Extract diagram descriptions showing red markers and measurement lines.`
+    };
+  }
+  if (title.includes("measure qa")) {
+    return {
+      schema: `{ "sampleSize": "string", "sampleType": "string", "measureDate": "string", "tables": [{"pom": "string", "code": "string", "target": "string", "actual": "string", "difference": "string", "tolerance": "string", "pass": "boolean"}], "overallResult": "string", "comments": ["string"] }`,
+      rules: `- Extract ALL rows from QA measurement evaluation tables.
+- Include target spec, actual measured value, difference, tolerance, and pass/fail per point.
+- Note sample type (PP/TOP/SIZE SET) and size being measured.
+- Extract overall result and any inspector comments.`
+    };
+  }
+
+  // --- Phase E: Quality & Shipping ---
+  if (title.includes("pp comments")) {
+    return {
+      schema: `{ "sampleType": "string", "submissionDate": "string", "approvalStatus": "string", "overallComments": "string", "comments": [{"area": "string", "issue": "string", "feedback": "string", "action": "string", "photoDescription": "string"}], "measurementComparison": [{"point": "string", "spec": "string", "actual": "string", "result": "string"}], "bulkNotes": ["string"], "defectPhotos": [{"area": "string", "description": "string", "severity": "string"}] }`,
+      rules: `- Extract PP sample review comments (PP办评语) with approval status and date.
+- Extract EVERY area-specific comment with issue, feedback, required action.
+- Describe defect/detail photos visible on the page (hem, seam, neckline issues).
+- Extract measurement comparison table if present (spec vs actual).
+- Extract ALL 大货注意 (bulk production notes).`
+    };
+  }
+  if (title.includes("fit photos")) {
+    return {
+      schema: `{ "photos": [{"view": "front|back|side|detail|flat|unknown", "garmentArea": "string", "description": "string", "comments": "string", "correctIncorrect": "string"}], "garmentOnForm": "boolean", "modelSize": "string", "sampleSize": "string", "overallFitComment": "string" }`,
+      rules: `- Describe EVERY photo visible on the page: view angle, garment area shown, what's depicted.
+- Note if photos show correct vs incorrect construction examples.
+- Include mannequin/model size and sample size if stated.
+- Extract all fit comments and annotations next to photos.`
+    };
+  }
+  if (title.includes("qa standards")) {
+    return {
+      schema: `{ "aql": "string", "inspectionLevel": "string", "criticalDefects": [{"defect": "string", "classification": "string", "acceptReject": "string"}], "majorDefects": [{"defect": "string", "classification": "string", "acceptReject": "string"}], "minorDefects": [{"defect": "string", "classification": "string", "acceptReject": "string"}], "testingRequirements": [{"test": "string", "standard": "string", "requirement": "string"}], "finishingChecklist": ["string"] }`,
+      rules: `- Extract AQL level and inspection level.
+- Separate defects into critical/major/minor with accept/reject criteria.
+- Extract ALL testing requirements (wash test, shrinkage, colorfastness, etc.).
+- Extract finishing checklist items if visible.`
+    };
+  }
+  if (title.includes("packaging")) {
+    return {
+      schema: `{ "foldingMethod": "string", "foldingDiagram": "string", "polybag": {"size": "string", "type": "string", "suffocationWarning": "boolean"}, "tissue": "string", "innerPack": {"method": "string", "quantity": "string"}, "carton": {"dimensions": "string", "weight": "string", "maxPieces": "number", "assortmentRatio": "string"}, "cartonMark": {"content": ["string"], "layout": "string"}, "barcodes": [{"type": "string", "position": "string", "content": "string"}], "packingInstructions": ["string"], "shipmentDetails": [{"lot": "string", "color": "string", "destination": "string", "quantity": "number", "cartons": "number"}] }`,
+      rules: `- Extract ALL packing details: folding method, polybag size/type, tissue paper, inner pack.
+- Extract carton specs: dimensions, weight limit, max pieces, assortment ratio.
+- Extract carton mark content and layout description.
+- Extract barcode placement and type (UPC, EAN, etc.).
+- Extract shipment lot details with destination, quantities, number of cartons.
+- Describe folding instruction diagrams if visible.`
+    };
+  }
+  if (title.includes("revision history")) {
+    return {
+      schema: `{ "revisions": [{"date": "string", "version": "string", "section": "string", "description": "string", "changedBy": "string", "approvedBy": "string"}], "carryoverNote": "string", "totalRevisions": "number" }`,
+      rules: `- Extract EVERY revision entry with date, version, section changed, description.
+- Include who made and who approved each change.
+- Note any carryover/reorder style notes.
+- Count total number of revisions.`
     };
   }
 
   // Default fallback
   return {
     schema: `{ "content": {} }`,
-    rules: "- Extract general data that is specific to the visible page."
+    rules: "- Extract ALL visible data on this page as structured key-value pairs. Do not skip any text."
   };
 }
 
