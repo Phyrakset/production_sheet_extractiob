@@ -386,6 +386,7 @@ function buildDisplayJson(pageResult) {
     styleId: pageResult.extraction?.styleId ?? null,
     summary: pageResult.extraction?.summary ?? null,
     data: pageResult.extraction?.data ?? {},
+    otherInformation: pageResult.extraction?.otherInformation ?? [],
     warnings: pageResult.extraction?.warnings ?? [],
   };
 }
