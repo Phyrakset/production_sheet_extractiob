@@ -19,6 +19,7 @@ const upload = multer({
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_VISION_MODEL = process.env.GEMINI_VISION_MODEL || "gemini-2.5-flash";
+const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash";
 
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
@@ -96,6 +97,114 @@ app.post("/api/extract", upload.array("files", 24), async (req, res) => {
     res.status(500).json({
       error: error.message || "Extraction failed",
     });
+  }
+});
+
+app.post("/api/merge", async (req, res) => {
+  try {
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY in .env" });
+    }
+
+    const { slotResults } = req.body;
+    if (!slotResults || Object.keys(slotResults).length === 0) {
+      return res.status(400).json({ error: "No extracted data provided" });
+    }
+
+    // Convert map to formatted JSON string
+    const inputDataStr = JSON.stringify(slotResults, null, 2);
+
+    const instruction = `
+You are a Master Production Planner. 
+Your task is to merge and synthesize the provided 19 fragments of JSON into ONE Final Production Sheet Master Template.
+Resolve any conflicting data intelligently (e.g. prioritize explicit DT Order values over sketching approximations).
+
+You MUST output ONLY valid JSON using the exact schema below representing the 9 distinct Rows of a professional Production Sheet:
+
+{
+  "row1_basicInfo": {
+    "styleNumber": "string|null",
+    "jobNumber": "string|null",
+    "poNumber": "string|null",
+    "orderQuantity": "number|null",
+    "colorBreakdown": [{"color": "string", "quantity": "number"}],
+    "sizeRatio": "string|null"
+  },
+  "row2_productionInstructions": {
+    "ppComments": ["string"],
+    "washingRequests": ["string"],
+    "printingWarnings": ["string"],
+    "tolerances": ["string"],
+    "overCutPercentage": "string|null"
+  },
+  "row4_sizeSpec": {
+    "measurements": [{"point": "string", "target": "string", "tolerance": "string"}]
+  },
+  "row5_packing": {
+    "foldingMethod": "string|null",
+    "cartonSizeLimits": "string|null",
+    "barcodeDetails": "string|null"
+  },
+  "row6_graphicPlacement": {
+    "logoType": "string|null",
+    "positionVertical": "string|null",
+    "positionHorizontal": "string|null",
+    "scalingRule": [{"size": "string", "scale": "string"}]
+  },
+  "row7_operationSequence": {
+    "sewingOperations": ["string"]
+  },
+  "row8_constructions": {
+    "stitchTypes": ["string"],
+    "seamFinishes": ["string"],
+    "bindingMethods": ["string"],
+    "specialNotes": ["string"]
+  },
+  "row9_threadConsumption": {
+    "totalPerGarment": "string|null",
+    "detailsBySeam": [{"seam": "string", "length": "string"}]
+  }
+}
+
+Here are the extracted documents:
+-------
+${inputDataStr}
+-------
+Return ONLY valid JSON without markdown fences.
+`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_TEXT_MODEL)}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          generationConfig: { temperature: 0.1, responseMimeType: "application/json" },
+          contents: [{ role: "user", parts: [{ text: instruction }] }],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(text);
+      throw new Error(`Gemini request failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    const rawText = result?.candidates?.[0]?.content?.parts?.map(part => part.text || "").join("") || "{}";
+    
+    let mergedJson;
+    try {
+      mergedJson = JSON.parse(rawText);
+    } catch {
+      mergedJson = { error: "Failed to parse AI output", raw: rawText };
+    }
+
+    res.json(mergedJson);
+  } catch (error) {
+    console.error("Merge error:", error);
+    res.status(500).json({ error: error.message || "Merge failed" });
   }
 });
 
@@ -184,6 +293,7 @@ Return this exact structure:
   "styleId": "string or null",
   "summary": "short summary",
   "data": ${config.schema},
+  "otherInformation": ["array of ANY text, notes, callouts, or data found on the page that does not logically fit into the specific 'data' fields provided. DO NOT ignore any text!"],
   "warnings": ["array of issues or unreadable areas"]
 }
 
