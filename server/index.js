@@ -4,8 +4,25 @@ import express from "express";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import multer from "multer";
+import { MongoClient } from "mongodb";
 
 dotenv.config();
+
+// ── MongoDB Connection ──
+const MONGODB_URI = process.env.MONGODB_URI;
+let mongoDb = null;
+
+if (MONGODB_URI) {
+  const mongoClient = new MongoClient(MONGODB_URI);
+  mongoClient.connect()
+    .then(() => {
+      mongoDb = mongoClient.db();
+      console.log("✅ Connected to MongoDB (sophy)");
+    })
+    .catch((err) => {
+      console.error("❌ MongoDB connection failed:", err.message);
+    });
+}
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -308,7 +325,7 @@ function getSlotConfig(slotTitle) {
   const title = String(slotTitle || "").toLowerCase();
 
   // --- Phase A: Order & Identity ---
-  if (title.includes("key notes")) {
+  if (title.includes("cover page")) {
     return {
       schema: `{
   "brand": "string",
@@ -554,6 +571,481 @@ function guessMimeType(fileName = "") {
   if (lower.endsWith(".webp")) return "image/webp";
   return "application/octet-stream";
 }
+
+// ── Translation API ──
+app.post("/api/translate", async (req, res) => {
+  try {
+    if (!GEMINI_API_KEY) {
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY in .env" });
+    }
+
+    const { jsonData, targetLang, slotTitle } = req.body;
+    if (!jsonData || !targetLang) {
+      return res.status(400).json({ error: "jsonData and targetLang are required" });
+    }
+
+    const langNames = { en: "English", zh: "Chinese (Simplified)", km: "Khmer (ខ្មែរ)" };
+    const targetLangName = langNames[targetLang] || targetLang;
+
+    // Step 1: Collect all translatable text values from the JSON (with their keys for context)
+    const textEntries = [];
+    function collectTexts(obj, path = "") {
+      if (obj === null || obj === undefined) return;
+      if (typeof obj === "string" && obj.trim().length > 0) {
+        textEntries.push({ path, value: obj });
+      } else if (Array.isArray(obj)) {
+        obj.forEach((item, i) => collectTexts(item, `${path}[${i}]`));
+      } else if (typeof obj === "object") {
+        for (const [key, val] of Object.entries(obj)) {
+          collectTexts(val, path ? `${path}.${key}` : key);
+        }
+      }
+    }
+    collectTexts(jsonData);
+
+    // Step 2: Lookup glossary matches — ONLY VERIFIED terms
+    let glossaryMap = {};
+    if (mongoDb && textEntries.length > 0) {
+      try {
+        const col = mongoDb.collection("glossaryterms");
+        const uniqueTexts = [...new Set(textEntries.map(e => e.value))];
+
+        // Only fetch VERIFIED terms for reliable translations
+        const verifiedFilter = { verificationStatus: "verified" };
+
+        // Query glossary for exact matches (case-insensitive) — verified only
+        const glossaryResults = await col.find({
+          ...verifiedFilter,
+          $or: [
+            { source: { $in: uniqueTexts } },
+            { source: { $in: uniqueTexts.map(t => t.toLowerCase()) } },
+            { source: { $in: uniqueTexts.map(t => t.toUpperCase()) } }
+          ]
+        }).toArray();
+
+        // Load all verified terms for partial matching within longer text
+        const allVerifiedTerms = await col.find(verifiedFilter)
+          .project({ source: 1, target: 1, sourceLang: 1, targetLang: 1, confidenceScore: 1 })
+          .limit(10000)
+          .toArray();
+
+        // Build a lookup: source text → target text for the requested language
+        const termLookup = {};
+        for (const term of [...glossaryResults, ...allVerifiedTerms]) {
+          const srcNorm = (term.source || "").trim().toLowerCase();
+          if (!srcNorm) continue;
+
+          const tgtLangNorm = (term.targetLang || "").replace("-hans", "").replace("-hant", "");
+          const srcLangNorm = (term.sourceLang || "").replace("-hans", "").replace("-hant", "");
+
+          if (tgtLangNorm === targetLang || (targetLang === "zh" && (term.targetLang === "zh-hans" || term.targetLang === "zh-hant"))) {
+            if (!termLookup[srcNorm] || term.confidenceScore > (termLookup[srcNorm].score || 0)) {
+              termLookup[srcNorm] = { text: term.target, score: term.confidenceScore || 0 };
+            }
+          }
+          if (srcLangNorm === targetLang) {
+            if (!termLookup[srcNorm]) {
+              termLookup[srcNorm] = { text: term.source, score: term.confidenceScore || 0, isSelf: true };
+            }
+          }
+        }
+
+        // Match text entries against glossary
+        for (const entry of uniqueTexts) {
+          const lower = entry.toLowerCase().trim();
+          // Exact match
+          if (termLookup[lower]) {
+            glossaryMap[entry] = termLookup[lower].text;
+            continue;
+          }
+          // Partial match: glossary terms within longer text (longest-first)
+          let translatedText = entry;
+          let matched = false;
+          const sortedTerms = Object.keys(termLookup).sort((a, b) => b.length - a.length);
+          for (const term of sortedTerms) {
+            if (term.length < 2) continue;
+            const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+            if (regex.test(translatedText)) {
+              translatedText = translatedText.replace(regex, termLookup[term].text);
+              matched = true;
+            }
+          }
+          if (matched && translatedText !== entry) {
+            glossaryMap[entry] = translatedText;
+          }
+        }
+
+        console.log(`Glossary: ${Object.keys(glossaryMap).length} matches from ${Object.keys(termLookup).length} verified terms`);
+      } catch (glossaryErr) {
+        console.warn("Glossary lookup failed, continuing with AI-only:", glossaryErr.message);
+      }
+    }
+
+    // Step 3: Identify remaining untranslated texts
+    const untranslatedTexts = textEntries
+      .map(e => e.value)
+      .filter(v => !glossaryMap[v])
+      .filter((v, i, arr) => arr.indexOf(v) === i);
+
+    // Step 4: Send remaining to Gemini with FULL CONTEXT for accurate translation
+    let aiTranslations = {};
+    if (untranslatedTexts.length > 0) {
+      // Build context-aware entries: include the JSON key path so AI understands what each text means
+      const contextMap = {};
+      for (const entry of textEntries) {
+        if (!glossaryMap[entry.value] && !contextMap[entry.value]) {
+          contextMap[entry.value] = entry.path;
+        }
+      }
+
+      const batchSize = 60;
+      for (let batchStart = 0; batchStart < untranslatedTexts.length; batchStart += batchSize) {
+        const batch = untranslatedTexts.slice(batchStart, batchStart + batchSize);
+        const numberedList = batch.map((t, i) => {
+          const fieldPath = contextMap[t] || "";
+          return `${i + 1}. [field: ${fieldPath}] ${JSON.stringify(t)}`;
+        }).join("\n");
+
+        const prompt = `You are an expert garment manufacturing and textile industry translator with deep knowledge of production sheet terminology.
+
+DOCUMENT CONTEXT:
+- This is a "${slotTitle || "Production Sheet"}" component from a garment factory production document.
+- The full JSON structure being translated:
+${JSON.stringify(jsonData, null, 1).slice(0, 3000)}
+
+TARGET LANGUAGE: ${targetLangName}
+
+YOUR TASK: Translate each numbered text below. Each entry shows [field: path.to.key] to help you understand the meaning in context.
+
+TRANSLATION RULES:
+1. DO NOT TRANSLATE — keep exactly as-is:
+   • Brand names: ABERCROMBIE & FITCH, Nike, GAP, Uniqlo, etc.
+   • Size codes: XXS, XS, S, M, L, XL, XXL, 2XL, 3XL
+   • Units: cm, inch, mm, g/m², oz, kg
+   • Industry abbreviations: AQL, SPI, BNT, HPS, HTM, UPC, EAN, PP, QC, QA, BOM, POM, HT, GSM, DTM
+   • Codes, IDs, numbers: style numbers, PO numbers, factory codes, color codes (#FF0000, Pantone 19-4052), dates
+   • Model/reference numbers, lot numbers, article numbers
+
+2. USE INDUSTRY-STANDARD TERMS for garment/textile concepts:
+   • Sewing: seam allowance, overlock, coverstitch, bartack, topstitch, binding, felling
+   • Fabric: warp, weft, grain line, selvage, bias, hand feel, drape, pilling
+   • Construction: facing, interlining, fusible, placket, gusset, yoke, dart
+   • QC: defect, tolerance, AQL, inline inspection, final audit, shade variation
+   • Packing: polybag, carton mark, assortment, folding method, suffocation warning
+
+3. CONTEXTUAL REASONING:
+   • Use the [field: ...] path to understand what each text means. For example:
+     - [field: data.notes[0]] → a production instruction/note
+     - [field: data.seams[0].type] → a seam type name
+     - [field: data.operations[2].description] → a sewing operation description
+     - [field: summary] → a brief document summary
+   • If a Chinese term like "大货" appears, translate as "bulk production" (EN) / "ការផលិតទំនិញច្រើន" (KM), not literally "big goods"
+   • "加裁" = "overcut/extra cutting", "抽办" = "sample pull", "面线" = "top thread / needle thread"
+   • Consider the FULL sentence context, not just individual words
+
+4. MIXED TEXT: If text has both translatable and untranslatable parts, translate only the meaningful parts.
+   Example: "大货面线针数请保持10-12针每寸" → keep numbers, translate the instruction around them.
+
+5. ALREADY IN TARGET: If text is already in ${targetLangName}, return unchanged.
+
+Return a JSON array where each element is the translated string, in the same order as input.
+Return ONLY the JSON array, no markdown fences.
+
+Input texts:
+${numberedList}`;
+
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_TEXT_MODEL)}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                generationConfig: { temperature: 0.15, responseMimeType: "application/json" },
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+              }),
+            }
+          );
+
+          if (response.ok) {
+            const result = await response.json();
+            const rawText = result?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("") || "[]";
+            try {
+              const translations = JSON.parse(rawText);
+              if (Array.isArray(translations)) {
+                batch.forEach((original, i) => {
+                  if (translations[i]) {
+                    aiTranslations[original] = translations[i];
+                  }
+                });
+              }
+            } catch {
+              console.warn("Failed to parse AI translation batch");
+            }
+          } else {
+            const errText = await response.text();
+            console.warn(`AI translation batch failed: ${response.status}`, errText.slice(0, 200));
+          }
+        } catch (fetchErr) {
+          console.warn("AI translation batch failed:", fetchErr.message);
+        }
+      }
+    }
+
+    // Step 5: Merge glossary + AI translations and rebuild the JSON
+    const allTranslations = { ...aiTranslations, ...glossaryMap }; // glossary (verified) takes priority
+
+    function applyTranslations(obj) {
+      if (obj === null || obj === undefined) return obj;
+      if (typeof obj === "string") {
+        return allTranslations[obj] || obj;
+      }
+      if (Array.isArray(obj)) {
+        return obj.map(item => applyTranslations(item));
+      }
+      if (typeof obj === "object") {
+        const result = {};
+        for (const [key, val] of Object.entries(obj)) {
+          result[key] = applyTranslations(val);
+        }
+        return result;
+      }
+      return obj;
+    }
+
+    const translatedJson = applyTranslations(jsonData);
+
+    res.json({
+      translatedAt: new Date().toISOString(),
+      targetLang,
+      glossaryMatches: Object.keys(glossaryMap).length,
+      aiTranslations: Object.keys(aiTranslations).length,
+      totalTexts: textEntries.length,
+      data: translatedJson,
+    });
+  } catch (error) {
+    console.error("Translation error:", error);
+    res.status(500).json({ error: error.message || "Translation failed" });
+  }
+});
+
+// ── Glossary API ──
+app.get("/api/glossary", async (req, res) => {
+  try {
+    if (!mongoDb) {
+      return res.status(503).json({ error: "MongoDB not connected" });
+    }
+
+    const col = mongoDb.collection("glossaryterms");
+    const {
+      q = "",
+      langPair = "",
+      status = "",
+      page = "1",
+      limit = "50",
+    } = req.query;
+
+    const filter = {};
+
+    // Search query across source and target fields
+    if (q.trim()) {
+      filter.$or = [
+        { source: { $regex: q.trim(), $options: "i" } },
+        { target: { $regex: q.trim(), $options: "i" } },
+      ];
+    }
+
+    // Language pair filter (e.g. "en::zh-hans")
+    if (langPair && langPair.includes("::")) {
+      const [src, tgt] = langPair.split("::");
+      if (src) filter.sourceLang = src;
+      if (tgt) filter.targetLang = tgt;
+    }
+
+    // Verification status filter
+    if (status && status !== "all") {
+      filter.verificationStatus = status;
+    }
+
+    const pageNum = Math.max(1, parseInt(page));
+    const pageSize = Math.min(100, Math.max(10, parseInt(limit)));
+    const skip = (pageNum - 1) * pageSize;
+
+    const [terms, total] = await Promise.all([
+      col.find(filter)
+        .sort({ confidenceScore: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .project({
+          source: 1,
+          target: 1,
+          sourceLang: 1,
+          targetLang: 1,
+          verificationStatus: 1,
+          confidenceScore: 1,
+          domain: 1,
+          project: 1,
+        })
+        .toArray(),
+      col.countDocuments(filter),
+    ]);
+
+    res.json({
+      terms,
+      total,
+      page: pageNum,
+      limit: pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    });
+  } catch (err) {
+    console.error("Glossary API error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Parallel Glossary (merged translations per term) ──
+app.get("/api/glossary/parallel", async (req, res) => {
+  try {
+    if (!mongoDb) {
+      return res.status(503).json({ error: "MongoDB not connected" });
+    }
+
+    const col = mongoDb.collection("glossaryterms");
+    const {
+      q = "",
+      status = "",
+      page = "1",
+      limit = "50",
+    } = req.query;
+
+    // Build a match stage
+    const matchStage = {};
+    if (q.trim()) {
+      matchStage.$or = [
+        { source: { $regex: q.trim(), $options: "i" } },
+        { target: { $regex: q.trim(), $options: "i" } },
+      ];
+    }
+    if (status && status !== "all") {
+      matchStage.verificationStatus = status;
+    }
+
+    const pageNum = Math.max(1, parseInt(page));
+    const pageSize = Math.min(100, Math.max(10, parseInt(limit)));
+
+    // Normalize language: zh-hans/zh-hant → zh for grouping
+    const pipeline = [
+      { $match: matchStage },
+      // Add a normalized source/target lang
+      {
+        $addFields: {
+          normSrc: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$sourceLang", "zh-hans"] }, then: "zh" },
+                { case: { $eq: ["$sourceLang", "zh-hant"] }, then: "zh" },
+              ],
+              default: "$sourceLang",
+            },
+          },
+          normTgt: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$targetLang", "zh-hans"] }, then: "zh" },
+                { case: { $eq: ["$targetLang", "zh-hant"] }, then: "zh" },
+              ],
+              default: "$targetLang",
+            },
+          },
+        },
+      },
+      // Collect translations per unique (source text + source lang)
+      {
+        $group: {
+          _id: { src: "$normSrc", text: "$source" },
+          translations: {
+            $push: { lang: "$normTgt", text: "$target" },
+          },
+          srcLang: { $first: "$normSrc" },
+          srcText: { $first: "$source" },
+          score: { $max: "$confidenceScore" },
+        },
+      },
+      { $sort: { score: -1, srcText: 1 } },
+    ];
+
+    // Count total grouped docs
+    const countPipeline = [...pipeline, { $count: "total" }];
+    const countResult = await col.aggregate(countPipeline).toArray();
+    const total = countResult[0]?.total || 0;
+
+    // Paginate
+    pipeline.push({ $skip: (pageNum - 1) * pageSize });
+    pipeline.push({ $limit: pageSize });
+
+    const grouped = await col.aggregate(pipeline).toArray();
+
+    // Flatten into { en, zh, km } rows
+    const rows = grouped.map((doc) => {
+      const row = { en: "", zh: "", km: "" };
+      // Set source text in its language slot
+      row[doc.srcLang] = doc.srcText;
+      // Set each translation in its language slot
+      doc.translations.forEach((t) => {
+        if (t.lang && t.text) row[t.lang] = t.text;
+      });
+      return row;
+    });
+
+    res.json({
+      rows,
+      total,
+      page: pageNum,
+      limit: pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    });
+  } catch (err) {
+    console.error("Glossary parallel API error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/glossary/stats", async (_req, res) => {
+  try {
+    if (!mongoDb) {
+      return res.status(503).json({ error: "MongoDB not connected" });
+    }
+
+    const col = mongoDb.collection("glossaryterms");
+
+    const [totalDocs, langPairs, statusCounts] = await Promise.all([
+      col.countDocuments(),
+      col.aggregate([
+        { $group: { _id: { src: "$sourceLang", tgt: "$targetLang" }, count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]).toArray(),
+      col.aggregate([
+        { $group: { _id: "$verificationStatus", count: { $sum: 1 } } },
+      ]).toArray(),
+    ]);
+
+    res.json({
+      total: totalDocs,
+      languagePairs: langPairs.map((lp) => ({
+        pair: `${lp._id.src}::${lp._id.tgt}`,
+        label: `${lp._id.src.toUpperCase()} → ${lp._id.tgt.toUpperCase()}`,
+        count: lp.count,
+      })),
+      statuses: statusCounts.reduce((acc, s) => {
+        acc[s._id] = s.count;
+        return acc;
+      }, {}),
+    });
+  } catch (err) {
+    console.error("Glossary stats error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.listen(port, () => {
   console.log(`Extractor server running on http://localhost:${port}`);
