@@ -1,4 +1,5 @@
 import React from 'react';
+import Comp01_CoverPage_GPAF6153 from './renderers/GPAF6153/Comp01_CoverPage';
 
 // ─── Component-Specific Renderers ───
 
@@ -376,26 +377,36 @@ export default function MasterDocument({ masterData, slotResults, onClose }) {
       </div>
 
       <div className="master-document">
-        {/* Document Header */}
-        <div className="doc-header">
-          <div className="doc-header-left">
-            <h1>PRODUCTION SHEET</h1>
-            {docBrand && <p><strong>Brand:</strong> {docBrand}</p>}
-            {docStyle && <p><strong>Style:</strong> {docStyle}</p>}
-            {docFactory && <p><strong>Factory:</strong> {docFactory}</p>}
+        {/* Document Header - Only for Legacy Mode */}
+        {!hasSlots && (
+          <div className="doc-header">
+            <div className="doc-header-left">
+              <h1>PRODUCTION SHEET</h1>
+              {docBrand && <p><strong>Brand:</strong> {docBrand}</p>}
+              {docStyle && <p><strong>Style:</strong> {docStyle}</p>}
+              {docFactory && <p><strong>Factory:</strong> {docFactory}</p>}
+            </div>
+            <div className="doc-header-right">
+              <p><strong>Date:</strong> {new Date().toLocaleDateString()}</p>
+              {docPO && <p><strong>PO#:</strong> {docPO}</p>}
+              {docQty && <p><strong>Quantity:</strong> {docQty}</p>}
+            </div>
           </div>
-          <div className="doc-header-right">
-            <p><strong>Date:</strong> {new Date().toLocaleDateString()}</p>
-            {docPO && <p><strong>PO#:</strong> {docPO}</p>}
-            {docQty && <p><strong>Quantity:</strong> {docQty}</p>}
-          </div>
-        </div>
+        )}
 
         {/* Render each slot in component-specific format */}
         {sortedSlots.map(([slotId, result]) => {
           const slotTitle = result?.slotTitle || '';
           const extraction = result?.extraction || {};
-          const Renderer = COMPONENT_MAP[slotTitle] || GenericSection;
+          let Renderer = COMPONENT_MAP[slotTitle] || GenericSection;
+          
+          // Style-specific routing override
+          if (slotTitle === 'Cover Page') {
+            const styleId = extraction?.styleId || extraction?.data?.styleNumber || '';
+            if (styleId === '122260171' || extraction?.data?.factoryNumber === 'GPAF6153' || docFactory === 'GPAF6153') {
+              Renderer = Comp01_CoverPage_GPAF6153;
+            }
+          }
           
           return (
             <Renderer

@@ -1066,7 +1066,7 @@ input {
 }
 
 @media print {
-  .uploader-panel, .hero, .panel-heading, .ambient, .result-placeholder { display: none !important; }
+  .uploader-panel, .hero, .panel-heading, .ambient, .result-placeholder, .glossary-section, .right-tabs, .glossary-panel, .export-btn, .print-btn, .compiler-modal, .mode-toggle, button { display: none !important; }
   body, html, #root, .app-shell, .workspace, .result-panel, .in-panel-master {
     display: block !important;
     height: auto !important;
@@ -1679,6 +1679,24 @@ input {
   border-bottom-color: #e74c3c;
 }
 
+.cover-page-section {
+  padding: 14px !important;
+  margin-bottom: 0 !important;
+}
+
+.cover-page-section > .comp-title-red {
+  font-size: 0 !important;
+  line-height: 1 !important;
+  margin-bottom: 8px !important;
+  padding-bottom: 6px !important;
+}
+
+.cover-page-section > .comp-title-red::before {
+  content: "注意大点";
+  font-size: 18px;
+  line-height: 1.15;
+}
+
 .comp-header-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1688,6 +1706,44 @@ input {
   background: white;
   border: 1px solid #eaeaea;
   border-radius: 6px;
+}
+
+.cover-page-section .comp-header-grid {
+  min-height: 116px;
+  margin-bottom: 8px;
+  padding: 8px;
+  gap: 12px;
+}
+
+.cover-page-section .comp-info-pairs tr:nth-child(1) .info-label,
+.cover-page-section .comp-info-pairs tr:nth-child(2) .info-label,
+.cover-page-section .comp-info-pairs tr:nth-child(4) .info-label,
+.cover-page-section .comp-notes-table th:first-child {
+  font-size: 0 !important;
+}
+
+.cover-page-section .comp-info-pairs tr:nth-child(1) .info-label::before {
+  content: "客款號:";
+  font-size: 12px;
+}
+
+.cover-page-section .comp-info-pairs tr:nth-child(2) .info-label::before {
+  content: "廠號:";
+  font-size: 12px;
+}
+
+.cover-page-section .comp-info-pairs tr:nth-child(4) .info-label::before {
+  content: "數量:";
+  font-size: 12px;
+}
+
+.cover-page-section .comp-notes-table th:first-child::before {
+  content: "大點:";
+  font-size: 12px;
+}
+
+.comp-sketch-placeholder {
+  min-height: 100px;
 }
 
 .comp-sketch-area {
@@ -1750,6 +1806,12 @@ input {
   padding: 10px 14px !important;
 }
 
+.cover-page-section .comp-notes-table th,
+.cover-page-section .comp-notes-table td {
+  padding: 6px 10px !important;
+  line-height: 1.35 !important;
+}
+
 .critical-row {
   background-color: #fff9c4 !important;
 }
@@ -1783,11 +1845,37 @@ input {
   background: #fafafa !important;
 }
 
+.nested-doc-table {
+  margin: 4px 0;
+  font-size: 12px !important;
+}
+
+.value-row + .value-row {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #eee;
+}
+
 @media print {
   .comp-section {
     background: transparent !important;
     border: none !important;
     padding: 10px 0 !important;
+  }
+  .cover-page-section {
+    padding: 0 !important;
+    page-break-after: auto;
+    page-break-inside: avoid;
+  }
+  .cover-page-section .comp-header-grid {
+    min-height: 96px;
+    margin-bottom: 6px;
+    padding: 6px;
+  }
+  .cover-page-section .comp-notes-table th,
+  .cover-page-section .comp-notes-table td {
+    padding: 5px 8px !important;
+    line-height: 1.25 !important;
   }
   .comp-header-grid {
     border: 1px solid #ccc !important;
