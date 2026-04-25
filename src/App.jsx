@@ -148,13 +148,13 @@ export default function App() {
   const [isCompiling, setIsCompiling] = useState(false);
 
   // Translation state
-  const [activeLang, setActiveLang] = useState(null); // null = original, "en"|"zh"|"km"
-  const [translatedResults, setTranslatedResults] = useState({}); // { "page-01::en": {...}, ... }
+  const [activeLang, setActiveLang] = useState(null);
+  const [translatedResults, setTranslatedResults] = useState({});
   const [isTranslating, setIsTranslating] = useState(false);
   const [translateStats, setTranslateStats] = useState(null);
 
   // Right panel tab state
-  const [rightTab, setRightTab] = useState("glossary"); // "extracts" | "glossary"
+  const [rightTab, setRightTab] = useState("glossary");
 
   // Glossary state
   const [glossaryTerms, setGlossaryTerms] = useState([]);
@@ -167,6 +167,17 @@ export default function App() {
   const [glossaryTotalPages, setGlossaryTotalPages] = useState(0);
   const [glossaryLoading, setGlossaryLoading] = useState(false);
   const searchTimeoutRef = useRef(null);
+
+  // ── Smart Upload state ──
+  const [uploadMode, setUploadMode] = useState("smart"); // "smart" | "manual"
+  const [autoExtractPhase, setAutoExtractPhase] = useState(null); // null | "splitting" | "classifying" | "extracting" | "complete"
+  const [autoExtractProgress, setAutoExtractProgress] = useState([]);
+  const [autoExtractFiles, setAutoExtractFiles] = useState([]);
+  const [classifiedPages, setClassifiedPages] = useState([]);
+  const [extractionProgress, setExtractionProgress] = useState([]);
+  const [autoTotalPages, setAutoTotalPages] = useState(0);
+  const [isAutoExtracting, setIsAutoExtracting] = useState(false);
+  const bulkInputRef = useRef(null);
 
   useEffect(() => {
     fetch("/api/health")
@@ -217,6 +228,123 @@ export default function App() {
     searchTimeoutRef.current = setTimeout(() => {
       fetchGlossary(value, glossaryLangPair, glossaryStatus, 1);
     }, 350);
+  };
+
+  // ── Smart Auto-Extract handler ──
+  const runAutoExtract = async (files) => {
+    if (!files || files.length === 0) return;
+
+    setIsAutoExtracting(true);
+    setAutoExtractPhase("splitting");
+    setAutoExtractProgress([]);
+    setClassifiedPages([]);
+    setExtractionProgress([]);
+    setAutoTotalPages(0);
+    setError("");
+    setSlotResults({});
+    setSlotFiles({});
+
+    const fileNames = Array.from(files).map((f) => f.name);
+    setAutoExtractFiles(fileNames);
+
+    const formData = new FormData();
+    Array.from(files).forEach((f) => formData.append("files", f, f.name));
+
+    try {
+      const response = await fetch("/api/auto-extract", {
+        method: "POST",
+        body: formData,
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            const eventType = line.slice(7).trim();
+            // Next line should be data:
+            const dataLineIdx = lines.indexOf(line) + 1;
+            // Handle in next iteration
+            continue;
+          }
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              handleSSEEvent(data);
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      setError("Auto-extract failed: " + err.message);
+    } finally {
+      setIsAutoExtracting(false);
+    }
+  };
+
+  const handleSSEEvent = (data) => {
+    // Determine event type from data content
+    if (data.phase) {
+      setAutoExtractPhase(data.phase);
+      if (data.totalPages) setAutoTotalPages(data.totalPages);
+    }
+    if (data.pages !== undefined && data.fileName && !data.componentId) {
+      // split event
+      setAutoExtractProgress((prev) => [...prev, { fileName: data.fileName, pages: data.pages }]);
+    }
+    if (data.componentId !== undefined && data.progress !== undefined) {
+      // classified event
+      setClassifiedPages((prev) => [
+        ...prev,
+        {
+          pageIndex: data.pageIndex,
+          fileName: data.fileName,
+          pageNumber: data.pageNumber,
+          componentId: data.componentId,
+          componentName: data.componentName,
+          confidence: data.confidence,
+          reasoning: data.reasoning,
+        },
+      ]);
+    }
+    if (data.componentId !== undefined && data.title && data.success !== undefined) {
+      // extracted event
+      setExtractionProgress((prev) => [
+        ...prev,
+        {
+          componentId: data.componentId,
+          slot: data.slot,
+          title: data.title,
+          pageCount: data.pageCount,
+          success: data.success,
+          error: data.error,
+        },
+      ]);
+    }
+    if (data.slots) {
+      // complete event
+      setAutoExtractPhase("complete");
+      setSlotResults(data.slots);
+      // Also set slotFiles for UI display
+      const newFiles = {};
+      Object.entries(data.slots).forEach(([slotId, result]) => {
+        newFiles[slotId] = { name: result.fileName, size: 0, type: "application/pdf" };
+      });
+      setSlotFiles(newFiles);
+    }
+    if (data.message && !data.phase && !data.slots) {
+      // error or warn
+      if (!data.pages) setError(data.message);
+    }
   };
 
   // Clipboard paste support: Win+Shift+S screenshot → Ctrl+V into active slot
@@ -464,7 +592,6 @@ export default function App() {
           </div>
         </div>
       </header>
-
       <main className="workspace">
         <section className="panel uploader-panel">
           <div className="panel-heading">
@@ -474,57 +601,217 @@ export default function App() {
               </svg>
               <h2>Garment Production Assets</h2>
             </div>
-            <span>{isLoading ? "extracting" : `${Object.keys(slotFiles).length}/19`}</span>
-          </div>
-
-          <div className="slot-list">
-            {["A", "B", "C", "D", "E"].map((phase) => (
-              <div key={`phase-${phase}`} className="phase-group">
-                <div className="phase-header">
-                  {phaseLabels[phase] || `Phase ${phase}`}
-                </div>
-                {documentSlots
-                  .filter((slot) => slot.phase === phase)
-                  .map((slot, index) => (
-                    <DocumentSlotCard
-                      key={slot.id}
-                      slot={slot}
-                      index={index}
-                      file={slotFiles[slot.id]}
-                      isActive={slot.id === activeSlotId}
-                      isDragging={slot.id === draggingSlotId}
-                      isLoading={isLoading && loadingSlotId === slot.id}
-                      isLocked={isLoading || isCompiling}
-                      onChoose={(event) => handleSelect(event.target.files, slot.id)}
-                      onActivate={() => setActiveSlotId(slot.id)}
-                      onDrop={(event) => handleDrop(event, slot.id)}
-                      onDragEnter={(event) => {
-                        event.preventDefault();
-                        setDraggingSlotId(slot.id);
-                      }}
-                      onDragLeave={(event) => {
-                        event.preventDefault();
-                        if (draggingSlotId === slot.id) {
-                          setDraggingSlotId("");
-                        }
-                      }}
-                      onClear={() => clearSlot(slot.id)}
-                    />
-                  ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="mode-toggle">
+                <button
+                  className={`mode-btn ${uploadMode === 'smart' ? 'active' : ''}`}
+                  onClick={() => setUploadMode('smart')}
+                  disabled={isLoading || isAutoExtracting}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                  Smart
+                </button>
+                <button
+                  className={`mode-btn ${uploadMode === 'manual' ? 'active' : ''}`}
+                  onClick={() => setUploadMode('manual')}
+                  disabled={isLoading || isAutoExtracting}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5"/></svg>
+                  Manual
+                </button>
               </div>
-            ))}
+              <span>{isAutoExtracting ? 'processing...' : `${Object.keys(slotFiles).length}/19`}</span>
+            </div>
           </div>
 
-          <div className="empty-state compact">
-            {isLoading ? (
-               <div className="inline-loader">
-                  <span className="spinner-small" />
-                  <strong>Extracting AI Data...</strong>
-               </div>
-            ) : (
-               <strong>{documentSlots.find((slot) => slot.id === activeSlotId)?.title || "Page"}</strong>
-            )}
-          </div>
+          {/* ── SMART UPLOAD MODE ── */}
+          {uploadMode === 'smart' && (
+            <div className="smart-upload-section">
+              {!isAutoExtracting && autoExtractPhase !== 'complete' && (
+                <div
+                  className="bulk-drop-zone"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    runAutoExtract(e.dataTransfer.files);
+                  }}
+                  onClick={() => bulkInputRef.current?.click()}
+                >
+                  <input
+                    ref={bulkInputRef}
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp"
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={(e) => runAutoExtract(e.target.files)}
+                  />
+                  <div className="bulk-drop-icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                    </svg>
+                  </div>
+                  <h3>Smart Upload</h3>
+                  <p>Drop all PDFs for a style number — AI will classify & extract all 19 components automatically</p>
+                  <span className="bulk-hint">Supports multi-page PDFs with auto page classification</span>
+                </div>
+              )}
+
+              {/* Progress Dashboard */}
+              {(isAutoExtracting || autoExtractPhase === 'complete') && (
+                <div className="auto-progress">
+                  {/* Splitting phase */}
+                  {autoExtractProgress.length > 0 && (
+                    <div className="progress-section">
+                      <div className="progress-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5"/></svg>
+                        Files Split
+                      </div>
+                      {autoExtractProgress.map((f, i) => (
+                        <div key={i} className="progress-file">
+                          <span className="progress-file-name">{f.fileName}</span>
+                          <span className="progress-file-pages">{f.pages} pages</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Classification phase */}
+                  {classifiedPages.length > 0 && (
+                    <div className="progress-section">
+                      <div className="progress-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                        Classifying Pages
+                        <span className="progress-count">{classifiedPages.length}/{autoTotalPages}</span>
+                      </div>
+                      <div className="progress-bar-wrap">
+                        <div
+                          className="progress-bar-fill"
+                          style={{ width: `${autoTotalPages ? (classifiedPages.length / autoTotalPages) * 100 : 0}%` }}
+                        />
+                      </div>
+                      <div className="classified-list">
+                        {classifiedPages.slice(-8).map((p, i) => (
+                          <div key={i} className={`classified-item ${p.confidence >= 0.8 ? 'high' : p.confidence >= 0.5 ? 'med' : 'low'}`}>
+                            <span className="cl-page">p{p.pageNumber}</span>
+                            <span className="cl-arrow">→</span>
+                            <span className="cl-comp">{p.componentName}</span>
+                            <span className="cl-conf">{Math.round(p.confidence * 100)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Extraction phase */}
+                  {extractionProgress.length > 0 && (
+                    <div className="progress-section">
+                      <div className="progress-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
+                        Extracting Components
+                      </div>
+                      {extractionProgress.map((e, i) => (
+                        <div key={i} className={`extraction-item ${e.success ? 'success' : 'fail'}`}>
+                          <span className="ext-status">{e.success ? '✅' : '❌'}</span>
+                          <span className="ext-title">{e.title}</span>
+                          <span className="ext-pages">{e.pageCount} pg{e.pageCount !== 1 ? 's' : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Complete */}
+                  {autoExtractPhase === 'complete' && (
+                    <div className="progress-complete">
+                      <span>✨ All components extracted!</span>
+                      <button className="reset-btn" onClick={() => {
+                        setAutoExtractPhase(null);
+                        setAutoExtractProgress([]);
+                        setClassifiedPages([]);
+                        setExtractionProgress([]);
+                      }}>Upload New Style</button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Show slot summary when complete */}
+              {autoExtractPhase === 'complete' && Object.keys(slotResults).length > 0 && (
+                <div className="slot-list compact-slots">
+                  {documentSlots.map((slot) => {
+                    const hasResult = !!slotResults[slot.id];
+                    const result = slotResults[slot.id];
+                    return (
+                      <div
+                        key={slot.id}
+                        className={`doc-slot accent-${slot.accent} ${slot.id === activeSlotId ? 'active' : ''} ${hasResult ? 'filled' : 'empty'}`}
+                        onClick={() => setActiveSlotId(slot.id)}
+                      >
+                        <div className="doc-slot-header">
+                          <span className="doc-slot-index">{slot.title}</span>
+                          {hasResult && <span className="slot-badge">{result.pageCount}p</span>}
+                          {!hasResult && <span className="slot-badge empty-badge">—</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── MANUAL UPLOAD MODE (original) ── */}
+          {uploadMode === 'manual' && (
+            <>
+              <div className="slot-list">
+                {["A", "B", "C", "D", "E"].map((phase) => (
+                  <div key={`phase-${phase}`} className="phase-group">
+                    <div className="phase-header">
+                      {phaseLabels[phase] || `Phase ${phase}`}
+                    </div>
+                    {documentSlots
+                      .filter((slot) => slot.phase === phase)
+                      .map((slot, index) => (
+                        <DocumentSlotCard
+                          key={slot.id}
+                          slot={slot}
+                          index={index}
+                          file={slotFiles[slot.id]}
+                          isActive={slot.id === activeSlotId}
+                          isDragging={slot.id === draggingSlotId}
+                          isLoading={isLoading && loadingSlotId === slot.id}
+                          isLocked={isLoading || isCompiling}
+                          onChoose={(event) => handleSelect(event.target.files, slot.id)}
+                          onActivate={() => setActiveSlotId(slot.id)}
+                          onDrop={(event) => handleDrop(event, slot.id)}
+                          onDragEnter={(event) => {
+                            event.preventDefault();
+                            setDraggingSlotId(slot.id);
+                          }}
+                          onDragLeave={(event) => {
+                            event.preventDefault();
+                            if (draggingSlotId === slot.id) {
+                              setDraggingSlotId("");
+                            }
+                          }}
+                          onClear={() => clearSlot(slot.id)}
+                        />
+                      ))}
+                  </div>
+                ))}
+              </div>
+
+              <div className="empty-state compact">
+                {isLoading ? (
+                   <div className="inline-loader">
+                     <span className="spinner-small" />
+                     <strong>Extracting AI Data...</strong>
+                   </div>
+                ) : (
+                   <strong>{documentSlots.find((slot) => slot.id === activeSlotId)?.title || "Page"}</strong>
+                )}
+              </div>
+            </>
+          )}
 
           {error ? <div className="error-box">{error}</div> : null}
         </section>
