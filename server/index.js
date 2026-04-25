@@ -5,6 +5,12 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import multer from "multer";
 import { MongoClient } from "mongodb";
+import {
+  classifyPage,
+  splitPdfPages,
+  mergePdfPages,
+  COMPONENT_SIGNATURES,
+} from "./classifyAgent.js";
 
 dotenv.config();
 
@@ -16,8 +22,9 @@ if (MONGODB_URI) {
   const mongoClient = new MongoClient(MONGODB_URI);
   mongoClient.connect()
     .then(() => {
+        // mongoDb = mongoClient.db();
       mongoDb = mongoClient.db();
-      console.log("✅ Connected to MongoDB (sophy)");
+      console.log("✅ Connected to MongoDB");
     })
     .catch((err) => {
       console.error("❌ MongoDB connection failed:", err.message);
@@ -29,7 +36,7 @@ const port = process.env.PORT || 3001;
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 20 * 1024 * 1024,
+    fileSize: 50 * 1024 * 1024,
     files: 24,
   },
 });
@@ -1044,6 +1051,306 @@ app.get("/api/glossary/stats", async (_req, res) => {
   } catch (err) {
     console.error("Glossary stats error:", err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Smart Auto-Extract Pipeline (SSE) ──
+
+/**
+ * Extract from MULTIPLE pages for a single component.
+ * Sends all page buffers together so Gemini sees the full context.
+ */
+async function extractMultiPage(pageBuffers, slotTitle) {
+  const instruction = buildSlotInstruction(slotTitle);
+
+  // Build inline data parts for every page
+  const pageParts = pageBuffers.map((buf) => ({
+    inlineData: {
+      mimeType: "application/pdf",
+      data: buf.toString("base64"),
+    },
+  }));
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+      GEMINI_VISION_MODEL
+    )}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: "application/json",
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text:
+                  instruction +
+                  `\n\nIMPORTANT: You are receiving ${pageBuffers.length} page(s) that all belong to the "${slotTitle}" component. Extract and MERGE data from ALL pages into a single comprehensive JSON. Do NOT lose any information from any page.`,
+              },
+              ...pageParts,
+            ],
+          },
+        ],
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Extraction failed: ${response.status} ${text.slice(0, 200)}`);
+  }
+
+  const result = await response.json();
+  const rawText =
+    result?.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text || "")
+      .join("") || "{}";
+
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    return {
+      pageType: slotTitle,
+      summary: "Model returned non-JSON output",
+      data: { rawText },
+      warnings: ["Gemini response could not be parsed as JSON"],
+    };
+  }
+}
+
+/**
+ * POST /api/auto-extract
+ *
+ * Accepts multiple PDF files, uses SSE to stream progress.
+ * Pipeline: split pages → classify each → group by component → extract per component.
+ */
+app.post("/api/auto-extract", upload.array("files", 24), async (req, res) => {
+  // Set up SSE
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+
+  function sendEvent(event, data) {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  }
+
+  try {
+    if (!GEMINI_API_KEY) {
+      sendEvent("error", { message: "Missing GEMINI_API_KEY in .env" });
+      res.end();
+      return;
+    }
+
+    const files = req.files || [];
+    if (!files.length) {
+      sendEvent("error", { message: "No files uploaded" });
+      res.end();
+      return;
+    }
+
+    // ── Phase 1: Split all PDFs into individual pages ──
+    sendEvent("phase", { phase: "splitting", message: "Splitting PDFs into pages..." });
+
+    const allPages = []; // { fileIndex, fileName, pageIndex, buffer }
+    for (let fi = 0; fi < files.length; fi++) {
+      const file = files[fi];
+      const isPdf = file.mimetype === "application/pdf" || file.originalname.toLowerCase().endsWith(".pdf");
+
+      if (isPdf) {
+        try {
+          const pageBuffers = await splitPdfPages(file.buffer);
+          for (let pi = 0; pi < pageBuffers.length; pi++) {
+            allPages.push({
+              fileIndex: fi,
+              fileName: file.originalname,
+              pageIndex: pi,
+              pageNumber: pi + 1,
+              totalPagesInFile: pageBuffers.length,
+              buffer: pageBuffers[pi],
+              mimeType: "application/pdf",
+            });
+          }
+          sendEvent("split", {
+            fileName: file.originalname,
+            pages: pageBuffers.length,
+          });
+        } catch (splitErr) {
+          sendEvent("warn", {
+            fileName: file.originalname,
+            message: `Failed to split: ${splitErr.message}`,
+          });
+        }
+      } else {
+        // Single image file — treat as 1 page
+        allPages.push({
+          fileIndex: fi,
+          fileName: file.originalname,
+          pageIndex: 0,
+          pageNumber: 1,
+          totalPagesInFile: 1,
+          buffer: file.buffer,
+          mimeType: file.mimetype,
+        });
+        sendEvent("split", { fileName: file.originalname, pages: 1 });
+      }
+    }
+
+    sendEvent("phase", {
+      phase: "classifying",
+      message: `Classifying ${allPages.length} pages...`,
+      totalPages: allPages.length,
+    });
+
+    // ── Phase 2: Classify each page ──
+    // Process in batches of 3 for rate-limiting
+    const CLASSIFY_BATCH = 3;
+    for (let i = 0; i < allPages.length; i += CLASSIFY_BATCH) {
+      const batch = allPages.slice(i, i + CLASSIFY_BATCH);
+      const results = await Promise.allSettled(
+        batch.map((page) =>
+          classifyPage(page.buffer, page.mimeType, GEMINI_API_KEY, GEMINI_VISION_MODEL)
+        )
+      );
+
+      results.forEach((result, batchIdx) => {
+        const pageIdx = i + batchIdx;
+        const page = allPages[pageIdx];
+        if (result.status === "fulfilled") {
+          page.classification = result.value;
+          sendEvent("classified", {
+            pageIndex: pageIdx,
+            fileName: page.fileName,
+            pageNumber: page.pageNumber,
+            totalPagesInFile: page.totalPagesInFile,
+            componentId: result.value.componentId,
+            componentName: result.value.componentName,
+            confidence: result.value.confidence,
+            reasoning: result.value.reasoning,
+            progress: pageIdx + 1,
+            total: allPages.length,
+          });
+        } else {
+          page.classification = { componentId: 0, componentName: "Unknown", confidence: 0 };
+          sendEvent("classified", {
+            pageIndex: pageIdx,
+            fileName: page.fileName,
+            pageNumber: page.pageNumber,
+            componentId: 0,
+            componentName: "Classification failed",
+            confidence: 0,
+            reasoning: result.reason?.message || "Unknown error",
+            progress: pageIdx + 1,
+            total: allPages.length,
+          });
+        }
+      });
+
+      // Small delay between batches to avoid rate limits
+      if (i + CLASSIFY_BATCH < allPages.length) {
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    }
+
+    // ── Phase 3: Group pages by component ──
+    const componentGroups = {}; // { componentId: { pages: [...], title, slot } }
+    for (const page of allPages) {
+      const cid = page.classification?.componentId || 0;
+      if (cid === 0) continue; // skip unclassified
+
+      if (!componentGroups[cid]) {
+        const sig = COMPONENT_SIGNATURES.find((s) => s.id === cid);
+        componentGroups[cid] = {
+          componentId: cid,
+          title: sig?.title || page.classification.componentName,
+          slot: sig?.slot || `page-${String(cid).padStart(2, "0")}`,
+          pages: [],
+        };
+      }
+      componentGroups[cid].pages.push(page);
+    }
+
+    sendEvent("phase", {
+      phase: "extracting",
+      message: `Extracting ${Object.keys(componentGroups).length} components...`,
+      components: Object.values(componentGroups).map((g) => ({
+        id: g.componentId,
+        title: g.title,
+        pageCount: g.pages.length,
+      })),
+    });
+
+    // ── Phase 4: Extract each component (all its pages together) ──
+    const slotResults = {};
+    const componentEntries = Object.values(componentGroups).sort(
+      (a, b) => a.componentId - b.componentId
+    );
+
+    for (const group of componentEntries) {
+      sendEvent("extracting", {
+        componentId: group.componentId,
+        title: group.title,
+        pageCount: group.pages.length,
+      });
+
+      try {
+        const pageBuffers = group.pages.map((p) => p.buffer);
+        const extraction = await extractMultiPage(pageBuffers, group.title);
+
+        const sourceFiles = [...new Set(group.pages.map((p) => p.fileName))];
+        const sourcePages = group.pages.map(
+          (p) => `${p.fileName} p${p.pageNumber}`
+        );
+
+        slotResults[group.slot] = {
+          slotId: group.slot,
+          slotTitle: group.title,
+          fileName: sourceFiles.join(", "),
+          sourcePages,
+          pageCount: group.pages.length,
+          extraction,
+        };
+
+        sendEvent("extracted", {
+          componentId: group.componentId,
+          slot: group.slot,
+          title: group.title,
+          pageCount: group.pages.length,
+          sourceFiles,
+          success: true,
+        });
+      } catch (exErr) {
+        sendEvent("extracted", {
+          componentId: group.componentId,
+          slot: group.slot,
+          title: group.title,
+          success: false,
+          error: exErr.message,
+        });
+      }
+
+      // Brief delay between extraction calls
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    // ── Phase 5: Complete ──
+    sendEvent("complete", {
+      totalFiles: files.length,
+      totalPages: allPages.length,
+      componentsFound: Object.keys(componentGroups).length,
+      slots: slotResults,
+    });
+  } catch (err) {
+    console.error("Auto-extract error:", err);
+    sendEvent("error", { message: err.message || "Auto-extract failed" });
+  } finally {
+    res.end();
   }
 });
 
