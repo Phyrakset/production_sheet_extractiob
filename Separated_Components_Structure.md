@@ -59,7 +59,7 @@ Contains 18 separated components:
 ### 2. `GPAR12172GD-2`
 Contains 18 separated components:
 * `Comp_01_注意大點_Key_Notes_Doc_GPAR12172GD-2_Pages_1.pdf`
-* `Comp_02_订单明细_Order_Details_Doc_GPAR12172GD-2_Pages_5.pdf`
+* `Comp_02_订单明细_Order_Details_Doc_GPAR12172GD-2_Pages_6.pdf`
 * `Comp_03_款式图_Tech_Sketch_Doc_GPAR12172GD-2_Pages_16.pdf`
 * `Comp_04_生产工艺_Construction_Doc_GPAR12172GD-2_Pages_6.pdf`
 * `Comp_05_缝制标准_Mfg_Standards_Doc_GPAR12172GD-2_Pages_11_12_13_14_15_16_17_18.pdf`

@@ -21,38 +21,41 @@ export default function Comp01_CoverPage_GPAF6153({ data, extraction }) {
   const totalQuantity = d.totalQuantity || '';
 
   return (
-    <div className="comp-section cover-page-section avoid-break">
-      {/* Header Table Matching Original */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid #000', marginBottom: '20px' }}>
+    <div className="comp-section cover-page-section gpaf6153-cover avoid-break">
+      {/* Top Table: Header and Sketch/Info */}
+      <table className="gpaf6153-table-top" style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid #000', borderBottom: 'none', fontSize: '14px' }}>
         <tbody>
+          {/* Row 1: Main Title */}
           <tr>
-            <td colSpan="2" style={{ textAlign: 'center', fontSize: '28px', fontWeight: 'bold', padding: '15px', borderBottom: '1px solid #000', letterSpacing: '2px' }}>
+            <td colSpan="2" style={{ textAlign: 'center', fontSize: '32px', fontWeight: 'bold', padding: '10px', borderBottom: '2px solid #000', letterSpacing: '4px' }}>
               注意大点
             </td>
           </tr>
+          
+          {/* Row 2: Sketch and Header Info */}
           <tr>
-            <td style={{ width: '60%', borderRight: '1px solid #000', padding: '20px', textAlign: 'center', verticalAlign: 'middle' }}>
+            <td style={{ width: '60%', borderRight: '2px solid #000', padding: '20px', textAlign: 'center', verticalAlign: 'middle' }}>
               {sketchDesc && <p style={{ fontStyle: 'italic', color: '#555', marginBottom: '10px' }}>{sketchDesc}</p>}
-              {brand && <p style={{ fontWeight: 'bold', fontSize: '18px', color: '#1a365d' }}>{brand}</p>}
+              {brand && <p style={{ fontWeight: 'bold', fontSize: '20px', color: '#1a365d' }}>{brand}</p>}
             </td>
             <td style={{ width: '40%', padding: '0', verticalAlign: 'top' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table style={{ width: '100%', height: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
                   <tr>
-                    <td style={{ padding: '12px 15px', borderBottom: '1px solid #000', borderRight: '1px solid #000', width: '30%' }}>客款號:</td>
-                    <td style={{ padding: '12px 15px', borderBottom: '1px solid #000', fontWeight: 'bold', fontSize: '16px' }}>{extraction?.styleId || d.styleNumber || 'N/A'}</td>
+                    <td style={{ padding: '10px 15px', borderBottom: '1px solid #000', borderRight: '1px solid #000', width: '30%', fontWeight: 'bold' }}>客款號：</td>
+                    <td style={{ padding: '10px 15px', borderBottom: '1px solid #000', fontWeight: 'bold', fontSize: '18px' }}>{extraction?.styleId || d.styleNumber || 'N/A'}</td>
                   </tr>
                   <tr>
-                    <td style={{ padding: '12px 15px', borderBottom: '1px solid #000', borderRight: '1px solid #000' }}>廠號:</td>
-                    <td style={{ padding: '12px 15px', borderBottom: '1px solid #000', fontWeight: 'bold', fontSize: '16px' }}>{factoryNumber || 'N/A'}</td>
+                    <td style={{ padding: '10px 15px', borderBottom: '1px solid #000', borderRight: '1px solid #000', fontWeight: 'bold' }}>廠號：</td>
+                    <td style={{ padding: '10px 15px', borderBottom: '1px solid #000', fontSize: '16px' }}>{factoryNumber || 'N/A'}</td>
                   </tr>
                   <tr>
-                    <td style={{ padding: '12px 15px', borderBottom: '1px solid #000', borderRight: '1px solid #000' }}>PO#</td>
-                    <td style={{ padding: '12px 15px', borderBottom: '1px solid #000', fontWeight: 'bold', fontSize: '16px' }}>{poNumber || 'N/A'}</td>
+                    <td style={{ padding: '10px 15px', borderBottom: '1px solid #000', borderRight: '1px solid #000', fontWeight: 'bold' }}>PO#</td>
+                    <td style={{ padding: '10px 15px', borderBottom: '1px solid #000', fontWeight: 'bold', fontSize: '16px' }}>{poNumber || 'N/A'}</td>
                   </tr>
                   <tr>
-                    <td style={{ padding: '12px 15px', borderRight: '1px solid #000' }}>數量:</td>
-                    <td style={{ padding: '12px 15px', fontWeight: 'bold', fontSize: '16px' }}>{totalQuantity || 'N/A'}</td>
+                    <td style={{ padding: '10px 15px', borderRight: '1px solid #000', fontWeight: 'bold' }}>數量：</td>
+                    <td style={{ padding: '10px 15px', fontSize: '16px' }}>{totalQuantity || 'N/A'}</td>
                   </tr>
                 </tbody>
               </table>
@@ -61,15 +64,16 @@ export default function Comp01_CoverPage_GPAF6153({ data, extraction }) {
         </tbody>
       </table>
 
-      {/* Notes table */}
-      <table className="doc-table comp-notes-table" style={{ borderCollapse: 'collapse', width: '100%', border: '1px solid #333' }}>
-        <thead>
-          <tr>
-            <th style={{ width: '50px', textAlign: 'center', background: 'yellow', border: '1px solid #333' }}>大點:</th>
-            <th style={{ border: '1px solid #333' }} />
-          </tr>
-        </thead>
+      {/* Bottom Table: Notes */}
+      <table className="gpaf6153-table-bottom" style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid #000', borderTop: '2px solid #000', fontSize: '14px' }}>
         <tbody>
+          {/* Row 3: 大點 Header Row */}
+          <tr>
+            <td style={{ width: '60px', textAlign: 'center', background: 'yellow', borderRight: '1px solid #000', borderBottom: '1px solid #000', padding: '6px', fontWeight: 'bold', fontSize: '12px' }}>大點：</td>
+            <td style={{ borderBottom: '1px solid #000' }}></td>
+          </tr>
+
+          {/* Row 4+: Notes */}
           {notes.map((note, i) => {
             const rawNote = d.rawNotes?.find(rn => rn.text && (rn.text === note || rn.text.includes(note) || note.includes(rn.text)));
             const isRedText = rawNote?.isRedText || criticalWarnings.some(w => note.includes(w) || w.includes(note));
@@ -84,19 +88,20 @@ export default function Comp01_CoverPage_GPAF6153({ data, extraction }) {
             
             return (
               <tr key={i} style={{ background: rowBg }}>
-                <td style={{ textAlign: 'center', fontWeight: 700, border: '1px solid #333', padding: '6px' }}>{numText}</td>
+                <td style={{ width: '60px', textAlign: 'center', fontWeight: 'bold', borderRight: '1px solid #000', borderBottom: '1px solid #000', padding: '8px' }}>{numText}</td>
                 <td style={{ 
-                  fontWeight: 700, 
+                  fontWeight: 'bold', 
                   color: isRedText ? '#cc0000' : '#000',
-                  border: '1px solid #333',
-                  padding: '6px 10px'
+                  borderBottom: '1px solid #000',
+                  padding: '8px 12px'
                 }}>
                   {contentText}
                 </td>
               </tr>
             );
           })}
-          {/* Render any critical warnings not already in notes (avoiding duplicates) */}
+          
+          {/* Render any critical warnings not already in notes */}
           {criticalWarnings.filter(w => !notes.some(n => n.includes(w) || w.includes(n))).map((w, i) => {
             const rawNote = d.rawNotes?.find(rn => rn.text && (rn.text === w || rn.text.includes(w) || w.includes(rn.text)));
             const hasYellowHighlight = rawNote?.hasYellowHighlight || false;
@@ -109,12 +114,12 @@ export default function Comp01_CoverPage_GPAF6153({ data, extraction }) {
             
             return (
               <tr key={`cw-${i}`} style={{ background: rowBg }}>
-                <td style={{ textAlign: 'center', fontWeight: 700, border: '1px solid #333', padding: '6px' }}>{numText}</td>
+                <td style={{ width: '60px', textAlign: 'center', fontWeight: 'bold', borderRight: '1px solid #000', borderBottom: '1px solid #000', padding: '8px' }}>{numText}</td>
                 <td style={{ 
-                  fontWeight: 700, 
+                  fontWeight: 'bold', 
                   color: '#cc0000',
-                  border: '1px solid #333',
-                  padding: '6px 10px'
+                  borderBottom: '1px solid #000',
+                  padding: '8px 12px'
                 }}>
                   {contentText}
                 </td>

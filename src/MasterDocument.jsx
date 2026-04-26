@@ -1,69 +1,17 @@
 import React from 'react';
 import Comp01_CoverPage_GPAF6153 from './renderers/GPAF6153/Comp01_CoverPage';
+import Comp02_OrderDetails_GPAF6153 from './renderers/GPAF6153/Comp02_OrderDetails';
+import Comp01_CoverPage_GPAR12172GD_2 from './renderers/GPAR12172GD-2/Comp01_CoverPage';
+import Comp02_OrderDetails_GPAR12172GD_2 from './renderers/GPAR12172GD-2/Comp02_OrderDetails';
+import Comp01_CoverPage_GPRT00077C from './renderers/GPRT00077C/Comp01_CoverPage';
+import Comp02_OrderDetails_GPRT00077C from './renderers/GPRT00077C/Comp02_OrderDetails';
+import Comp01_CoverPage_PTBC0047 from './renderers/PTBC0047/Comp01_CoverPage';
+import Comp01_CoverPage_PTCOC270_270A from './renderers/PTCOC270_270A/Comp01_CoverPage';
+import Comp01_CoverPage_PTCOM227 from './renderers/PTCOM227/Comp01_CoverPage';
 
 // ─── Component-Specific Renderers ───
 
-function KeyNotesSection({ data, extraction }) {
-  const d = extraction?.data || data?.data || {};
-  const brand = extraction?.brand || data?.brand || '';
-  const styleId = extraction?.styleId || data?.styleId || '';
-  const notes = d.notes || [];
-  const criticalWarnings = d.criticalWarnings || [];
-  const factoryNumber = d.factoryNumber || '';
-  const poNumber = d.poNumber || '';
-  const totalQuantity = d.totalQuantity || '';
-  const garmentType = d.garmentType || '';
-  const sketchDesc = d.sketchDescription || extraction?.summary || '';
-
-  return (
-    <div className="comp-section avoid-break">
-      <h2 className="comp-title comp-title-red">注意大点 Cover Page</h2>
-      
-      {/* Header info bar */}
-      <div className="comp-header-grid">
-        <div className="comp-sketch-area">
-          {sketchDesc && <p className="comp-sketch-desc">{sketchDesc}</p>}
-          {brand && <p className="comp-brand-name">{brand}</p>}
-        </div>
-        <div className="comp-info-table">
-          <table className="doc-table comp-info-pairs">
-            <tbody>
-              <tr><td className="info-label">客款號:</td><td className="info-value"><strong>{extraction?.styleId || d.styleNumber || 'N/A'}</strong></td></tr>
-              <tr><td className="info-label">廠號:</td><td className="info-value"><strong>{factoryNumber || 'N/A'}</strong></td></tr>
-              <tr><td className="info-label">PO#</td><td className="info-value"><strong>{poNumber || 'N/A'}</strong></td></tr>
-              <tr><td className="info-label">數量:</td><td className="info-value"><strong>{totalQuantity || 'N/A'}</strong></td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Notes table */}
-      <table className="doc-table comp-notes-table">
-        <thead>
-          <tr>
-            <th style={{ width: '50px', textAlign: 'center' }}>大點:</th>
-            <th>Instructions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {notes.map((note, i) => (
-            <tr key={i} className={criticalWarnings.includes(note) ? 'critical-row' : ''}>
-              <td style={{ textAlign: 'center', fontWeight: 700 }}>{i + 1}</td>
-              <td style={{ fontWeight: 700, color: criticalWarnings.includes(note) ? '#e74c3c' : '#333' }}>{note}</td>
-            </tr>
-          ))}
-          {/* Render any critical warnings not already in notes */}
-          {criticalWarnings.filter(w => !notes.includes(w)).map((w, i) => (
-            <tr key={`cw-${i}`} className="critical-row">
-              <td style={{ textAlign: 'center', fontWeight: 700 }}>{notes.length + i + 1}</td>
-              <td style={{ fontWeight: 700, color: '#e74c3c' }}>{w}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+// KeyNotesSection has been removed in favor of style-specific renderers.
 
 function OrderDetailsSection({ data, extraction }) {
   const d = extraction?.data || data?.data || {};
@@ -318,7 +266,7 @@ function ListBlock({ title, items }) {
 
 // ─── Slot title → component renderer mapping ───
 const COMPONENT_MAP = {
-  'Cover Page':       KeyNotesSection,
+  'Cover Page':       GenericSection,
   'Order Details':   OrderDetailsSection,
   'Construction':    ConstructionSection,
   'Mfg Standards':   MfgStandardsSection,
@@ -400,11 +348,39 @@ export default function MasterDocument({ masterData, slotResults, onClose }) {
           const extraction = result?.extraction || {};
           let Renderer = COMPONENT_MAP[slotTitle] || GenericSection;
           
-          // Style-specific routing override
           if (slotTitle === 'Cover Page') {
-            const styleId = extraction?.styleId || extraction?.data?.styleNumber || '';
-            if (styleId === '122260171' || extraction?.data?.factoryNumber === 'GPAF6153' || docFactory === 'GPAF6153') {
+            const styleId = extraction?.styleId || extraction?.data?.styleNumber || extraction?.pageRef || '';
+            const factoryNumber = extraction?.data?.factoryNumber || extraction?.pageRef || '';
+            const custStyle = extraction?.data?.customerStyle || '';
+            const title = extraction?.data?.title || '';
+            
+            if (styleId === '122260171' || factoryNumber === 'GPAF6153' || docFactory === 'GPAF6153') {
               Renderer = Comp01_CoverPage_GPAF6153;
+            } else if (styleId === 'GPAR12172GD-2' || factoryNumber === 'GPAR12172GD-2' || docFactory === 'GPAR12172GD-2' || custStyle.includes('GPAR12172GD-2')) {
+              Renderer = Comp01_CoverPage_GPAR12172GD_2;
+            } else if (styleId === 'GPRT00077C' || factoryNumber === 'GPRT00077C' || docFactory === 'GPRT00077C' || title.includes('GPRT00077C')) {
+              Renderer = Comp01_CoverPage_GPRT00077C;
+            } else if (styleId === 'PTBC0047' || factoryNumber === 'PTBC0047' || docFactory === 'PTBC0047' || title.includes('PTBC0047')) {
+              Renderer = Comp01_CoverPage_PTBC0047;
+            } else if (styleId === 'PTCOC270_270A' || factoryNumber.includes('PTCOC270') || docFactory.includes('PTCOC270') || title.includes('PTCOC270')) {
+              Renderer = Comp01_CoverPage_PTCOC270_270A;
+            } else if (styleId === 'PTCOM227' || factoryNumber.includes('PTCOM227') || docFactory.includes('PTCOM227') || title.includes('PTCOM227')) {
+              Renderer = Comp01_CoverPage_PTCOM227;
+            }
+          }
+          
+          if (slotTitle === 'Order Details') {
+            const styleId = extraction?.styleId || extraction?.data?.styleNumber || extraction?.pageRef || '';
+            const factoryNumber = extraction?.data?.factoryNumber || extraction?.pageRef || '';
+            const custStyle = extraction?.data?.customerStyle || '';
+            const centricTitle = extraction?.data?.header?.titleLine1 || '';
+            
+            if (styleId === '122260171' || factoryNumber === 'GPAF6153' || docFactory === 'GPAF6153') {
+              Renderer = Comp02_OrderDetails_GPAF6153;
+            } else if (styleId === 'GPAR12172GD-2' || factoryNumber === 'GPAR12172GD-2' || docFactory === 'GPAR12172GD-2' || custStyle.includes('GPAR12172GD-2') || centricTitle.includes('YORKWELL')) {
+              Renderer = Comp02_OrderDetails_GPAR12172GD_2;
+            } else if (styleId === 'GPRT00077C' || factoryNumber === 'GPRT00077C' || docFactory === 'GPRT00077C') {
+              Renderer = Comp02_OrderDetails_GPRT00077C;
             }
           }
           

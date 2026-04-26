@@ -33,11 +33,27 @@ export async function getSlotConfig(slotTitle, styleId) {
   }
 
   if (agentFileName) {
+    // Helper to extract config from either default or named exports
+    const extractConfig = (mod) => {
+      if (mod.default) return mod.default;
+      let schema = null;
+      let rules = mod.extractionPrompt || "";
+      for (const [key, value] of Object.entries(mod)) {
+        if (key.endsWith("_Schema") || key.includes("Schema")) {
+          schema = value;
+          break;
+        }
+      }
+      if (schema) return { schema, rules };
+      return null;
+    };
+
     // 1. Try to load style-specific config
     if (styleId) {
       try {
         const mod = await import(`./${styleId}/${agentFileName}.js`);
-        if (mod && mod.default) return mod.default;
+        const config = extractConfig(mod);
+        if (config) return config;
       } catch (e) {
         // Fallback if not found
       }
@@ -46,7 +62,8 @@ export async function getSlotConfig(slotTitle, styleId) {
     // 2. Try to load generic config
     try {
       const mod = await import(`./generic/${agentFileName}.js`);
-      if (mod && mod.default) return mod.default;
+      const config = extractConfig(mod);
+      if (config) return config;
     } catch (e) {
       // Fallback below
     }

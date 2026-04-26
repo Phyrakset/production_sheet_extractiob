@@ -11,7 +11,12 @@ import {
   mergePdfPages,
   COMPONENT_SIGNATURES,
 } from "./classifyAgent.js";
+import { detectDocumentFormat } from "./formatAgent.js";
 import { getSlotConfig } from "./agents/AgentOrchestrator.js";
+
+// Global cache for visually detected document styles
+// Key: base file name (e.g., 'FFS 99-03-44504-SP26.pdf'), Value: 'GPAR12172GD-2'
+const globalStyleCache = {};
 
 dotenv.config();
 
@@ -233,18 +238,49 @@ Return ONLY valid JSON without markdown fences.
   }
 });
 
-async function extractDocumentFromGemini(file, slotTitle = "Page") {
+async function extractDocumentFromGemini(file, slotTitle = "Page", cachedStyleId = null) {
   const inferredPages = inferSourcePagesFromFileName(file.originalname);
   const sourceContext = {
     files: [file.originalname],
     pages: inferredPages.length ? inferredPages.map((page) => `${file.originalname} p${page}`) : [`${file.originalname} p1`],
     mimeTypes: [file.mimetype || guessMimeType(file.originalname)],
   };
-  // Try to extract styleId from filename (e.g. Doc_GPAF6153_Pages)
-  let styleId = null;
-  const styleMatch = file.originalname.match(/Doc_([A-Z0-9\-]+)_Pages/i);
-  if (styleMatch) {
-    styleId = styleMatch[1];
+  
+  let styleId = cachedStyleId;
+  const baseFilename = file.originalname.replace(/(_Page_?\d+|\_Pages?| \d+)\.pdf$/i, '.pdf').trim();
+  
+  // 1. Try to get styleId from global cache first
+  if (!styleId && globalStyleCache[baseFilename]) {
+    styleId = globalStyleCache[baseFilename];
+    console.log(`[Cache Hit] Using global cached Style ID: ${styleId} for ${file.originalname}`);
+  }
+
+  // 2. Try to extract styleId from filename (e.g. Doc_GPAF6153_Pages) if no cache
+  if (!styleId) {
+    const styleMatch = file.originalname.match(/Doc_([A-Z0-9\-]+)_Pages/i);
+    if (styleMatch) {
+      styleId = styleMatch[1];
+    }
+  }
+
+  // 3. If still no styleId, run the Format Subagent to visually detect the layout!
+  if (!styleId) {
+    console.log(`[Format Subagent] No explicit Style ID found for ${file.originalname}. Visually detecting layout...`);
+    try {
+      const formatResult = await detectDocumentFormat(
+        file.buffer,
+        file.mimetype || guessMimeType(file.originalname),
+        GEMINI_API_KEY,
+        GEMINI_VISION_MODEL
+      );
+      if (formatResult.detectedStyleId && formatResult.detectedStyleId !== "generic") {
+        styleId = formatResult.detectedStyleId;
+        globalStyleCache[baseFilename] = styleId; // Save to global cache
+        console.log(`[Format Subagent] Detected format style: ${styleId} (confidence: ${formatResult.confidence})`);
+      }
+    } catch (e) {
+      console.error("[Format Subagent] Detection failed:", e.message);
+    }
   }
   
   const instruction = await buildSlotInstruction(slotTitle, sourceContext, styleId);
@@ -291,7 +327,7 @@ async function extractDocumentFromGemini(file, slotTitle = "Page") {
     result?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("") || "{}";
 
   try {
-    return normalizeExtractionResult(JSON.parse(rawText), slotTitle, sourceContext);
+    return normalizeExtractionResult(JSON.parse(rawText), slotTitle, sourceContext, styleId);
   } catch {
     return normalizeExtractionResult({
       pageType: slotTitle,
@@ -303,7 +339,7 @@ async function extractDocumentFromGemini(file, slotTitle = "Page") {
         rawText,
       },
       warnings: ["Gemini response could not be parsed as JSON"],
-    }, slotTitle, sourceContext);
+    }, slotTitle, sourceContext, styleId);
   }
 }
 
@@ -352,7 +388,7 @@ Return this exact structure:
   "pageRef": "string or null",
   "styleId": "string or null",
   "summary": "short summary",
-  "data": ${config.schema},
+  "data": ${typeof config.schema === 'object' ? JSON.stringify(config.schema, null, 2) : config.schema},
   "otherInformation": ["array of ANY text, notes, callouts, stamps, or data found on the page that does not logically fit into the specific 'data' fields provided. DO NOT ignore any text!"],
   "qualityChecks": {
     "extractedAllVisibleText": "boolean",
@@ -394,27 +430,38 @@ function getComponentAgent(slotTitle) {
   };
 }
 
-function normalizeExtractionResult(extraction, slotTitle, sourceContext = {}) {
+function normalizeExtractionResult(extraction, slotTitle, sourceContext = {}, detectedStyleId = null) {
   const agent = getComponentAgent(slotTitle);
   const sourceFiles = sourceContext.files?.length ? sourceContext.files : [];
   const sourcePages = sourceContext.pages?.length ? sourceContext.pages : sourceFiles.map((file) => `${file} p1`);
   const normalized = extraction && typeof extraction === "object" ? extraction : {};
   const data = normalized.data || {};
 
-  // Process rawNotes if they exist
+  // Process rawNotes if they exist — only derive notes/criticalWarnings
+  // from rawNotes when Gemini has NOT already populated them.
+  // This prevents duplicate notes appearing in the rendered output.
   if (Array.isArray(data.rawNotes) && data.rawNotes.length > 0) {
-    if (!Array.isArray(data.notes)) data.notes = [];
-    if (!Array.isArray(data.criticalWarnings)) data.criticalWarnings = [];
-    
-    data.rawNotes.forEach(note => {
-      if (!note.text) return;
-      data.notes.push(note.text);
-      
-      const isRed = note.isRedText === true || String(note.fontColor || "").toLowerCase().includes("red");
-      if (isRed || note.hasYellowHighlight) {
-        data.criticalWarnings.push(note.text);
-      }
-    });
+    const hasExistingNotes = Array.isArray(data.notes) && data.notes.length > 0;
+    const hasExistingWarnings = Array.isArray(data.criticalWarnings) && data.criticalWarnings.length > 0;
+
+    if (!hasExistingNotes) {
+      data.notes = [];
+      data.rawNotes.forEach(note => {
+        if (!note.text) return;
+        data.notes.push(note.text);
+      });
+    }
+
+    if (!hasExistingWarnings) {
+      data.criticalWarnings = [];
+      data.rawNotes.forEach(note => {
+        if (!note.text) return;
+        const isRed = note.isRedText === true || String(note.fontColor || "").toLowerCase().includes("red");
+        if (isRed || note.hasYellowHighlight) {
+          data.criticalWarnings.push(note.text);
+        }
+      });
+    }
     
     // Deduplicate just in case
     data.notes = [...new Set(data.notes)];
@@ -438,7 +485,7 @@ function normalizeExtractionResult(extraction, slotTitle, sourceContext = {}) {
     pageType: normalized.pageType || slotTitle,
     brand: normalized.brand ?? null,
     pageRef: normalized.pageRef ?? null,
-    styleId: normalized.styleId ?? null,
+    styleId: normalized.styleId || detectedStyleId || null,
     summary: normalized.summary || "",
     data,
     otherInformation: Array.isArray(normalized.otherInformation) ? normalized.otherInformation : [],
@@ -1010,8 +1057,8 @@ app.get("/api/glossary/stats", async (_req, res) => {
  * Extract from MULTIPLE pages for a single component.
  * Sends all page buffers together so Gemini sees the full context.
  */
-async function extractMultiPage(pageBuffers, slotTitle, sourceContext = {}) {
-  const instruction = buildSlotInstruction(slotTitle, sourceContext);
+async function extractMultiPage(pageBuffers, slotTitle, sourceContext = {}, styleId = null) {
+  const instruction = await buildSlotInstruction(slotTitle, sourceContext, styleId);
 
   // Build inline data parts for every page
   const pageParts = pageBuffers.map((buf) => ({
@@ -1062,14 +1109,14 @@ async function extractMultiPage(pageBuffers, slotTitle, sourceContext = {}) {
       .join("") || "{}";
 
   try {
-    return normalizeExtractionResult(JSON.parse(rawText), slotTitle, sourceContext);
+    return normalizeExtractionResult(JSON.parse(rawText), slotTitle, sourceContext, styleId);
   } catch {
     return normalizeExtractionResult({
       pageType: slotTitle,
       summary: "Model returned non-JSON output",
       data: { rawText },
       warnings: ["Gemini response could not be parsed as JSON"],
-    }, slotTitle, sourceContext);
+    }, slotTitle, sourceContext, styleId);
   }
 }
 
@@ -1105,10 +1152,12 @@ app.post("/api/auto-extract", upload.array("files", 24), async (req, res) => {
       return;
     }
 
-    // ── Phase 1: Split all PDFs into individual pages ──
-    sendEvent("phase", { phase: "splitting", message: "Splitting PDFs into pages..." });
+    // ── Phase 1: Split all PDFs into individual pages & Detect Formats ──
+    sendEvent("phase", { phase: "splitting", message: "Analyzing formats and splitting PDFs into pages..." });
 
     const allPages = []; // { fileIndex, fileName, pageIndex, buffer }
+    const fileStyleCache = {}; // { fileName: styleId }
+    
     for (let fi = 0; fi < files.length; fi++) {
       const file = files[fi];
       const isPdf = file.mimetype === "application/pdf" || file.originalname.toLowerCase().endsWith(".pdf");
@@ -1116,6 +1165,22 @@ app.post("/api/auto-extract", upload.array("files", 24), async (req, res) => {
       if (isPdf) {
         try {
           const pageBuffers = await splitPdfPages(file.buffer);
+          
+          // --- FORMAT DETECTION (Cache first page layout) ---
+          if (pageBuffers.length > 0) {
+            console.log(`[Bulk Upload] Detecting format for ${file.originalname}...`);
+            try {
+              const formatResult = await detectDocumentFormat(pageBuffers[0], "application/pdf", GEMINI_API_KEY, GEMINI_VISION_MODEL);
+              if (formatResult.detectedStyleId && formatResult.detectedStyleId !== "generic") {
+                fileStyleCache[file.originalname] = formatResult.detectedStyleId;
+                console.log(`[Bulk Upload] Cached style ${formatResult.detectedStyleId} for ${file.originalname}`);
+              }
+            } catch (e) {
+              console.error("[Bulk Upload] Format detection failed:", e.message);
+            }
+          }
+          // --------------------------------------------------
+          
           for (let pi = 0; pi < pageBuffers.length; pi++) {
             allPages.push({
               fileIndex: fi,
@@ -1255,11 +1320,12 @@ app.post("/api/auto-extract", upload.array("files", 24), async (req, res) => {
         const sourcePages = group.pages.map(
           (p) => `${p.fileName} p${p.pageNumber}`
         );
+        const styleId = fileStyleCache[sourceFiles[0]] || null;
         const extraction = await extractMultiPage(pageBuffers, group.title, {
           files: sourceFiles,
           pages: sourcePages,
           mimeTypes: [...new Set(group.pages.map((p) => p.mimeType))],
-        });
+        }, styleId);
 
         slotResults[group.slot] = {
           slotId: group.slot,
