@@ -1,12 +1,14 @@
 /**
- * GPRT00077C-specific extraction agent for MfgStandards
- * Re-exports generic rules initially.
- * Override 'schema' or 'rules' to customize LLM extraction for this style.
+ * GPRT00077C-specific extraction agent for Comp05_MfgStandards
+ * ──────────────────────────────────────────────────
+ * Status: PENDING PRESS-MATCHING
+ * This agent has been decoupled from the generic configuration.
+ * Please update the schema and prompt below to match the actual PDF.
  */
-import genericConfig from '../generic/Comp05_MfgStandards.js';
-
 export default {
-  ...genericConfig,
-  // Add style-specific schema modifications or rules here if needed:
-  // rules: genericConfig.rules + "\n- Style specific rule...",
+  schema: `{ "cutting": [{"item": "string", "standard": "string"}], "fusing": [{"item": "string", "standard": "string"}], "needle": [{"area": "string", "needleType": "string", "size": "string"}], "stitching": [{"seam": "string", "stitchType": "string", "spi": "string", "width": "string"}], "pressing": [{"item": "string", "standard": "string"}], "finishing": [{"item": "string", "standard": "string"}], "labeling": [{"item": "string", "requirement": "string"}], "minimumStandards": ["string"], "constructionDiagrams": [{"area": "string", "description": "string"}] }`,
+  rules: `- Extract ALL MFTG Standards rows as structured items with standard descriptions.
+- Include construction diagrams descriptions (hood, pocket, hem, etc.).
+- Extract CUT/SEW KNIT TOPS MINIMUM STANDARDS table items.
+- Extract labeling requirements, pressing specs, finishing standards.`
 };

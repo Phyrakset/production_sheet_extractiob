@@ -1,10 +1,23 @@
+import React from 'react';
+
 /**
- * PTCOM227-specific renderer for HTMGuide
+ * PTCOM227-specific renderer for Comp13_HTMGuide
  * ──────────────────────────────────────────────────
- * Status: NOT YET TESTED — re-exports from generic renderer.
- * To customize: replace the re-export with style-specific rendering logic
- * after press-matching against the original PDF.
- * 
- * Source PDF: Comp_13_*_Doc_PTCOM227_Pages_*.pdf
+ * Status: PENDING PRESS-MATCHING
+ * This component has been isolated from generic fallbacks.
+ * Please implement the style-specific layout here.
  */
-export { default } from '../Comp13_HTMGuide';
+export default function Comp13_HTMGuide_PTCOM227({ data, extraction, slotTitle }) {
+  return (
+    <div className="comp-section avoid-break" style={{ border: '2px dashed #ff9900', padding: 20, margin: '10px 0' }}>
+      <h2 className="comp-title">{slotTitle || 'Comp13_HTMGuide'} - PTCOM227</h2>
+      <div style={{ color: '#ff9900', fontWeight: 'bold' }}>
+        [PENDING PRESS-MATCHING]
+      </div>
+      <p style={{ marginTop: 10, fontSize: 13 }}>
+        This module has been isolated for <strong>PTCOM227</strong>.
+        Please provide the original PDF to implement the pixel-perfect layout.
+      </p>
+    </div>
+  );
+}

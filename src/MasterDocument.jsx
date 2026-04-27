@@ -1,13 +1,22 @@
 import React from 'react';
 import Comp01_CoverPage_GPAF6153 from './renderers/GPAF6153/Comp01_CoverPage';
 import Comp02_OrderDetails_GPAF6153 from './renderers/GPAF6153/Comp02_OrderDetails';
+import Comp03_TechSketch_GPAF6153 from './renderers/GPAF6153/Comp03_TechSketch';
 import Comp01_CoverPage_GPAR12172GD_2 from './renderers/GPAR12172GD-2/Comp01_CoverPage';
 import Comp02_OrderDetails_GPAR12172GD_2 from './renderers/GPAR12172GD-2/Comp02_OrderDetails';
+import Comp03_TechSketch_GPAR12172GD_2 from './renderers/GPAR12172GD-2/Comp03_TechSketch';
 import Comp01_CoverPage_GPRT00077C from './renderers/GPRT00077C/Comp01_CoverPage';
 import Comp02_OrderDetails_GPRT00077C from './renderers/GPRT00077C/Comp02_OrderDetails';
+import Comp03_TechSketch_GPRT00077C from './renderers/GPRT00077C/Comp03_TechSketch';
 import Comp01_CoverPage_PTBC0047 from './renderers/PTBC0047/Comp01_CoverPage';
+import Comp02_OrderDetails_PTBC0047 from './renderers/PTBC0047/Comp02_OrderDetails';
 import Comp01_CoverPage_PTCOC270_270A from './renderers/PTCOC270_270A/Comp01_CoverPage';
+import Comp02_OrderDetails_PTCOC270_270A from './renderers/PTCOC270_270A/Comp02_OrderDetails';
+import Comp03_TechSketch_PTCOC270_270A from './renderers/PTCOC270_270A/Comp03_TechSketch';
 import Comp01_CoverPage_PTCOM227 from './renderers/PTCOM227/Comp01_CoverPage';
+import Comp02_OrderDetails_PTCOM227 from './renderers/PTCOM227/Comp02_OrderDetails';
+import Comp03_TechSketch_PTCOM227 from './renderers/PTCOM227/Comp03_TechSketch';
+import Comp04_Construction_GPAF6153 from './renderers/GPAF6153/Comp04_Construction';
 
 // ─── Component-Specific Renderers ───
 
@@ -348,11 +357,13 @@ export default function MasterDocument({ masterData, slotResults, onClose }) {
           const extraction = result?.extraction || {};
           let Renderer = COMPONENT_MAP[slotTitle] || GenericSection;
           
+          const styleId = extraction?.styleId || extraction?.data?.styleNumber || extraction?.pageRef || '';
+          const factoryNumber = extraction?.data?.factoryNumber || extraction?.pageRef || '';
+          const custStyle = extraction?.data?.customerStyle || '';
+          const title = extraction?.data?.title || '';
+          const centricTitle = extraction?.data?.header?.titleLine1 || '';
+          
           if (slotTitle === 'Cover Page') {
-            const styleId = extraction?.styleId || extraction?.data?.styleNumber || extraction?.pageRef || '';
-            const factoryNumber = extraction?.data?.factoryNumber || extraction?.pageRef || '';
-            const custStyle = extraction?.data?.customerStyle || '';
-            const title = extraction?.data?.title || '';
             
             if (styleId === '122260171' || factoryNumber === 'GPAF6153' || docFactory === 'GPAF6153') {
               Renderer = Comp01_CoverPage_GPAF6153;
@@ -370,10 +381,6 @@ export default function MasterDocument({ masterData, slotResults, onClose }) {
           }
           
           if (slotTitle === 'Order Details') {
-            const styleId = extraction?.styleId || extraction?.data?.styleNumber || extraction?.pageRef || '';
-            const factoryNumber = extraction?.data?.factoryNumber || extraction?.pageRef || '';
-            const custStyle = extraction?.data?.customerStyle || '';
-            const centricTitle = extraction?.data?.header?.titleLine1 || '';
             
             if (styleId === '122260171' || factoryNumber === 'GPAF6153' || docFactory === 'GPAF6153') {
               Renderer = Comp02_OrderDetails_GPAF6153;
@@ -381,6 +388,28 @@ export default function MasterDocument({ masterData, slotResults, onClose }) {
               Renderer = Comp02_OrderDetails_GPAR12172GD_2;
             } else if (styleId === 'GPRT00077C' || factoryNumber === 'GPRT00077C' || docFactory === 'GPRT00077C') {
               Renderer = Comp02_OrderDetails_GPRT00077C;
+            } else if (styleId === 'PTBC0047' || factoryNumber === 'PTBC0047' || docFactory === 'PTBC0047') {
+              Renderer = Comp02_OrderDetails_PTBC0047;
+            } else if (styleId === 'PTCOC270_270A' || factoryNumber.includes('PTCOC270') || docFactory.includes('PTCOC270') || custStyle.includes('STCO4143')) {
+              Renderer = Comp02_OrderDetails_PTCOC270_270A;
+            } else if (styleId === 'PTCOM227' || factoryNumber.includes('PTCOM227') || docFactory.includes('PTCOM227') || custStyle.includes('3AFESHSP1')) {
+              Renderer = Comp02_OrderDetails_PTCOM227;
+            }
+          } else if (slotTitle.toLowerCase().includes('tech sketch')) {
+            if (styleId === 'GPAF6153' || factoryNumber === 'GPAF6153' || docFactory === 'GPAF6153' || docStyle === 'GPAF6153' || result?.fileName?.includes('GPAF6153')) {
+              Renderer = Comp03_TechSketch_GPAF6153;
+            } else if (styleId === 'GPAR12172GD-2' || factoryNumber === 'GPAR12172GD-2' || docFactory === 'GPAR12172GD-2' || docStyle === 'GPAR12172GD-2' || custStyle.includes('GPAR12172GD-2') || centricTitle.includes('YORKWELL') || result?.fileName?.includes('GPAR12172GD-2')) {
+              Renderer = Comp03_TechSketch_GPAR12172GD_2;
+            } else if (styleId === 'GPRT00077C' || factoryNumber === 'GPRT00077C' || docFactory === 'GPRT00077C' || docStyle === 'GPRT00077C' || custStyle.includes('GPRT00077C') || result?.fileName?.includes('GPRT00077C') || result?.styleId?.includes('GPRT00077C') || JSON.stringify(extraction).includes('GPRT00077C')) {
+              Renderer = Comp03_TechSketch_GPRT00077C;
+            } else if (styleId === 'PTCOC270_270A' || factoryNumber.includes('PTCOC270') || docFactory.includes('PTCOC270') || custStyle.includes('STCO4143') || result?.fileName?.includes('PTCOC270') || JSON.stringify(extraction).includes('PTCOC270') || JSON.stringify(extraction).includes('STCO4143')) {
+              Renderer = Comp03_TechSketch_PTCOC270_270A;
+            } else if (styleId === 'PTCOM227' || factoryNumber.includes('PTCOM227') || docFactory.includes('PTCOM227') || custStyle.includes('3AFESHSP1') || result?.fileName?.includes('PTCOM227') || JSON.stringify(extraction).includes('PTCOM227')) {
+              Renderer = Comp03_TechSketch_PTCOM227;
+            }
+          } else if (slotTitle === 'Construction' || slotTitle === 'Mfg Standards' || slotTitle === 'Production Instructions') {
+            if (styleId === 'GPAF6153' || factoryNumber === 'GPAF6153' || docFactory === 'GPAF6153' || docStyle === 'GPAF6153' || result?.fileName?.includes('GPAF6153')) {
+              Renderer = Comp04_Construction_GPAF6153;
             }
           }
           

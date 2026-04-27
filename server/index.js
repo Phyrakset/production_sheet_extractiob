@@ -257,7 +257,7 @@ async function extractDocumentFromGemini(file, slotTitle = "Page", cachedStyleId
 
   // 2. Try to extract styleId from filename (e.g. Doc_GPAF6153_Pages) if no cache
   if (!styleId) {
-    const styleMatch = file.originalname.match(/Doc_([A-Z0-9\-]+)_Pages/i);
+    const styleMatch = file.originalname.match(/Doc_([A-Z0-9\-_]+)_Pages/i);
     if (styleMatch) {
       styleId = styleMatch[1];
     }

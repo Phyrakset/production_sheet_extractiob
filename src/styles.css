@@ -359,7 +359,11 @@ input {
 }
 
 .doc-slot-content strong {
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
   margin-bottom: 6px;
 }
 

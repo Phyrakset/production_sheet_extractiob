@@ -1,12 +1,14 @@
 /**
- * PTBC0047-specific extraction agent for Artwork
- * Re-exports generic rules initially.
- * Override 'schema' or 'rules' to customize LLM extraction for this style.
+ * PTBC0047-specific extraction agent for Comp10_Artwork
+ * ──────────────────────────────────────────────────
+ * Status: PENDING PRESS-MATCHING
+ * This agent has been decoupled from the generic configuration.
+ * Please update the schema and prompt below to match the actual PDF.
  */
-import genericConfig from '../generic/Comp10_Artwork.js';
-
 export default {
-  ...genericConfig,
-  // Add style-specific schema modifications or rules here if needed:
-  // rules: genericConfig.rules + "\n- Style specific rule...",
+  schema: `{ "artworks": [{"artworkCode": "string", "type": "print|embroidery|heat_transfer|other", "placement": "string", "position": {"fromTop": "string", "fromCenter": "string", "fromEdge": "string"}, "dimensions": {"width": "string", "height": "string"}, "colors": [{"name": "string", "code": "string", "thread": "string"}], "stitchCount": "string", "stitchType": "string"}], "renderDescriptions": ["string"], "approvalStatus": "string", "notes": ["string"] }`,
+  rules: `- Extract ALL artwork entries with code, type, exact placement measurements.
+- For embroidery: include stitch count, stitch type, thread colors with codes.
+- For prints: include ink colors, print method, dimensions.
+- Describe 3D renders or placement diagrams visible on the page.`
 };

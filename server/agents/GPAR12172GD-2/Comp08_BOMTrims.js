@@ -1,12 +1,14 @@
 /**
- * GPAR12172GD-2-specific extraction agent for BOMTrims
- * Re-exports generic rules initially.
- * Override 'schema' or 'rules' to customize LLM extraction for this style.
+ * GPAR12172GD-2-specific extraction agent for Comp08_BOMTrims
+ * ──────────────────────────────────────────────────
+ * Status: PENDING PRESS-MATCHING
+ * This agent has been decoupled from the generic configuration.
+ * Please update the schema and prompt below to match the actual PDF.
  */
-import genericConfig from '../generic/Comp08_BOMTrims.js';
-
 export default {
-  ...genericConfig,
-  // Add style-specific schema modifications or rules here if needed:
-  // rules: genericConfig.rules + "\n- Style specific rule...",
+  schema: `{ "trims": [{"category": "string", "part": "string", "description": "string", "size": "string", "color": "string", "colorCode": "string", "quantity": "string", "unit": "string", "supplier": "string", "supplierCode": "string", "comments": "string"}], "threads": [{"type": "string", "color": "string", "colorCode": "string", "ticketNumber": "string", "usage": "string"}], "packingMaterials": [{"item": "string", "size": "string", "quantity": "string", "supplier": "string"}] }`,
+  rules: `- Extract EVERY row from trims BOM: zippers, buttons, elastic, drawcord, rivets, etc.
+- Separate thread details (type, color, ticket#, usage area).
+- Separate packing materials (polybag, tissue, hanger, etc.) if listed in same BOM.
+- Include all supplier codes, sizes, and color codes.`
 };

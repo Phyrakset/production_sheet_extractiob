@@ -1,12 +1,14 @@
 /**
- * GPRT00077C-specific extraction agent for HTMGuide
- * Re-exports generic rules initially.
- * Override 'schema' or 'rules' to customize LLM extraction for this style.
+ * GPRT00077C-specific extraction agent for Comp13_HTMGuide
+ * ──────────────────────────────────────────────────
+ * Status: PENDING PRESS-MATCHING
+ * This agent has been decoupled from the generic configuration.
+ * Please update the schema and prompt below to match the actual PDF.
  */
-import genericConfig from '../generic/Comp13_HTMGuide.js';
-
 export default {
-  ...genericConfig,
-  // Add style-specific schema modifications or rules here if needed:
-  // rules: genericConfig.rules + "\n- Style specific rule...",
+  schema: `{ "garmentType": "string", "instructions": [{"code": "string", "name": "string", "howToMeasure": "string", "startPoint": "string", "endPoint": "string", "diagramDescription": "string", "specialNotes": "string"}], "generalCriteria": ["string"] }`,
+  rules: `- Extract EVERY measurement point from HTM/度尺图 diagrams.
+- For each point describe: where to start measuring, where to end, how to position garment.
+- Include general measurement criteria (e.g., "measure garment laid flat", "HPS definition").
+- Extract diagram descriptions showing red markers and measurement lines.`
 };
