@@ -1,5 +1,5 @@
 /**
- * PTCOC270_270A-specific extraction agent for Comp04_Construction
+ * PTCOM227-specific extraction agent for Comp04_Instruction
  * ──────────────────────────────────────────────────
  * Status: PENDING PRESS-MATCHING
  * This agent has been decoupled from the generic configuration.

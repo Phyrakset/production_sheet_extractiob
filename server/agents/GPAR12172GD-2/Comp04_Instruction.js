@@ -1,5 +1,5 @@
 /**
- * GPRT00077C-specific extraction agent for Comp04_Construction
+ * GPAR12172GD-2-specific extraction agent for Comp04_Instruction
  * ──────────────────────────────────────────────────
  * Status: PENDING PRESS-MATCHING
  * This agent has been decoupled from the generic configuration.

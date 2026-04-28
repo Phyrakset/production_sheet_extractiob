@@ -1,5 +1,5 @@
 /**
- * GPAF6153-specific extraction agent for Comp04_Construction
+ * GPAF6153-specific extraction agent for Comp04_Instruction
  * ──────────────────────────────────────────────────
  * Status: PENDING PRESS-MATCHING
  * This agent has been decoupled from the generic configuration.

@@ -87,7 +87,7 @@ const styles = {
   }
 };
 
-export default function Comp04_Construction_GPAF6153({ extraction }) {
+export default function Comp04_Instruction_GPAF6153({ extraction }) {
   const data = extraction?.data || {};
   const header = data.header || {};
   const instructions = data.instructions || [];
