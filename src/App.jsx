@@ -89,7 +89,7 @@ const LANG_FULL_NAMES = {
 };
 const phaseLabels = {
   A: "A · Order & Identity",
-  B: "B · Design & Construction",
+  B: "B · Design & Instruction",
   C: "C · Materials & BOM",
   D: "D · Measurement & Fit",
   E: "E · Quality & Shipping",
@@ -99,31 +99,35 @@ const documentSlots = [
   // Phase A — Order & Identity
   { id: "page-01", title: "Cover Page", accent: "crimson", phase: "A" },
   { id: "page-02", title: "Order Details", accent: "orange", phase: "A" },
+  { id: "page-25", title: "Properties of Order", accent: "azure", phase: "A" },
 
-  // Phase B — Design & Construction
+  // Phase B — Design & Instruction
   { id: "page-03", title: "Tech Sketch", accent: "teal", phase: "B" },
-  { id: "page-04", title: "Construction", accent: "slate", phase: "B" },
-  { id: "page-05", title: "Mfg Standards", accent: "steel", phase: "B" },
-  { id: "page-06", title: "Colorways", accent: "amber", phase: "B" },
+  { id: "page-26", title: "Style Template", accent: "purple", phase: "B" },
+  { id: "page-04", title: "Instruction", accent: "slate", phase: "B" },
+  { id: "page-05", title: "MFTG Standards", accent: "steel", phase: "B" },
+  { id: "page-22", title: "Process Sheet", accent: "olive", phase: "B" },
+  { id: "page-23", title: "Special Instruction", accent: "copper", phase: "B" },
+  { id: "page-30", title: "Placement", accent: "emerald", phase: "B" },
 
   // Phase C — Materials & BOM
   { id: "page-07", title: "BOM Fabrics", accent: "blue", phase: "C" },
-  { id: "page-08", title: "BOM Trims", accent: "emerald", phase: "C" },
-  { id: "page-09", title: "Labels", accent: "violet", phase: "C" },
-  { id: "page-10", title: "Artwork", accent: "gold", phase: "C" },
-
+  { id: "page-28", title: "Fabrics Consumption", accent: "sky", phase: "C" },
+  { id: "page-08", title: "Multi-level Placements", accent: "emerald", phase: "C" },
+  { id: "page-27", title: "Embroidery Specification", accent: "pink", phase: "C" },
+  
   // Phase D — Measurement & Fit
-  { id: "page-11", title: "POMs", accent: "cyan", phase: "D" },
-  { id: "page-12", title: "Grading", accent: "sky", phase: "D" },
-  { id: "page-13", title: "HTM Guide", accent: "lime", phase: "D" },
-  { id: "page-14", title: "Measure QA", accent: "mint", phase: "D" },
+  { id: "page-11", title: "POMs Measurement", accent: "cyan", phase: "D" },
+  { id: "page-13", title: "Measurement Guide", accent: "lime", phase: "D" },
+  { id: "page-20", title: "Size Spec", accent: "indigo", phase: "D" },
+  { id: "page-24", title: "Measurement Spec", accent: "fuchsia", phase: "D" },
+  { id: "page-29", title: "Measurement Evaluation", accent: "rose", phase: "D" },
+  { id: "page-31", title: "Measurement Instruction", accent: "slate", phase: "D" },
 
   // Phase E — Quality & Shipping
-  { id: "page-15", title: "PP Comments", accent: "coral", phase: "E" },
-  { id: "page-16", title: "Fit Photos", accent: "magenta", phase: "E" },
-  { id: "page-17", title: "QA Standards", accent: "red", phase: "E" },
+  { id: "page-15", title: "Approval Comment", accent: "coral", phase: "E" },
   { id: "page-18", title: "Packaging", accent: "rose", phase: "E" },
-  { id: "page-19", title: "Revision History", accent: "pewter", phase: "E" },
+  { id: "page-21", title: "Technical Team Note", accent: "bronze", phase: "E" },
 ];
 
 const phaseTitles = {
@@ -587,8 +591,7 @@ export default function App() {
             </svg>
           </div>
           <div className="hero-text">
-            <h1>Production Extractor</h1>
-            <span className="badge">19-Slot Analysis</span>
+            <span className="badge">23-Slot Analysis</span>
           </div>
         </div>
       </header>
@@ -620,7 +623,7 @@ export default function App() {
                   Manual
                 </button>
               </div>
-              <span>{isAutoExtracting ? 'processing...' : `${Object.keys(slotFiles).length}/19`}</span>
+              <span>{isAutoExtracting ? 'processing...' : `${Object.keys(slotFiles).length}/23`}</span>
             </div>
           </div>
 
@@ -770,11 +773,11 @@ export default function App() {
                     </div>
                     {documentSlots
                       .filter((slot) => slot.phase === phase)
-                      .map((slot, index) => (
+                      .map((slot) => (
                         <DocumentSlotCard
                           key={slot.id}
                           slot={slot}
-                          index={index}
+                          index={documentSlots.indexOf(slot)}
                           file={slotFiles[slot.id]}
                           isActive={slot.id === activeSlotId}
                           isDragging={slot.id === draggingSlotId}

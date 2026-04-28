@@ -10,7 +10,7 @@ const components = {
   1: { name: "注意大點 Key Notes", A: [1], B: [1], C: [1], D: [1], E: [1], F: [1] },
   2: { name: "订单明细 Order Details", A: [9], B: [2], C: [5], D: [2], E: [2, 3], F: [2] },
   3: { name: "款式图 Tech Sketch", A: [2], B: [18], C: [16], E: [11] },
-  4: { name: "生产工艺 Construction", A: [8, 10], B: [5, 6], C: [6], E: [5, 6, 7], F: [4] },
+  4: { name: "生产工艺 Instruction", A: [8, 10], B: [5, 6], C: [6], E: [5, 6, 7], F: [4] },
   5: { name: "缝制标准 Mfg Standards", A: [11, 12], B: [8], C: [11, 12, 13, 14, 15, 16, 17, 18] },
   6: { name: "颜色 Colorways", A: [3], B: [9], C: [21, 22, 23], D: [5, 6, 7, 8, 9, 10] },
   7: { name: "面料物料 BOM Fabrics", B: [4, 19, 20], C: [18, 19], D: [5, 6, 7, 8], F: [3] },

@@ -48,7 +48,7 @@ export const COMPONENT_SIGNATURES = [
   {
     id: 4,
     slot: "page-04",
-    title: "Construction",
+    title: "Instruction",
     zhName: "生产工艺",
     keywords: [
       "construction", "sewing operation", "工序表", "工艺单",
@@ -61,7 +61,7 @@ export const COMPONENT_SIGNATURES = [
   {
     id: 5,
     slot: "page-05",
-    title: "Mfg Standards",
+    title: "MFTG Standards",
     zhName: "缝制标准",
     keywords: [
       "manufacturing standards", "MFTG", "minimum standards",
@@ -71,18 +71,7 @@ export const COMPONENT_SIGNATURES = [
     description:
       "Manufacturing standards: cutting, fusing, needle, stitching, pressing, finishing, labeling specs. Construction diagrams (hood, pocket, hem). Minimum standards table.",
   },
-  {
-    id: 6,
-    slot: "page-06",
-    title: "Colorways",
-    zhName: "颜色",
-    keywords: [
-      "colorway", "pantone", "color matching", "fabric color",
-      "wash type", "color approval", "颜色", "配色", "pantone",
-    ],
-    description:
-      "Colorway entries (name, code, Pantone, wash type, fabric color), color matching photos with approval notes, BOM items per colorway.",
-  },
+
   {
     id: 7,
     slot: "page-07",
@@ -99,7 +88,7 @@ export const COMPONENT_SIGNATURES = [
   {
     id: 8,
     slot: "page-08",
-    title: "BOM Trims",
+    title: "Multi-level Placements",
     zhName: "辅料",
     keywords: [
       "trims", "zipper", "button", "elastic", "drawcord",
@@ -109,36 +98,12 @@ export const COMPONENT_SIGNATURES = [
     description:
       "Trims BOM: zippers, buttons, elastic, drawcord, rivets, etc. Thread details (type, color, ticket#). Packing materials (polybag, tissue, hanger).",
   },
-  {
-    id: 9,
-    slot: "page-09",
-    title: "Labels",
-    zhName: "唛头标签",
-    keywords: [
-      "label", "hangtag", "heat transfer", "care label",
-      "size label", "brand label", "UPC", "barcode label",
-      "唛头", "标签", "吊牌",
-    ],
-    description:
-      "Label entries: brand, care, size, content, country-of-origin, UPC. Placement and attach method. Hangtag and heat transfer details.",
-  },
-  {
-    id: 10,
-    slot: "page-10",
-    title: "Artwork",
-    zhName: "印花绣花",
-    keywords: [
-      "artwork", "embroidery", "print", "heat transfer",
-      "stitch count", "placement diagram", "3D render",
-      "印花", "绣花", "刺绣",
-    ],
-    description:
-      "Artwork details: code, type (print/embroidery/HT), placement measurements, colors with codes, stitch count/type, render/placement diagrams.",
-  },
+
+
   {
     id: 11,
     slot: "page-11",
-    title: "POMs",
+    title: "POMs Measurement",
     zhName: "成品尺寸",
     keywords: [
       "POM", "point of measure", "size spec", "measurement",
@@ -148,22 +113,11 @@ export const COMPONENT_SIGNATURES = [
     description:
       "POM/size spec table: measurement point codes and names, tolerance values, size columns (3XS through 3XL) with values.",
   },
-  {
-    id: 12,
-    slot: "page-12",
-    title: "Grading",
-    zhName: "放码规则",
-    keywords: [
-      "grading", "grade rule", "increment", "GRADING APPROVED",
-      "放码", "base size", "size range",
-    ],
-    description:
-      "Grading rules: approval status/date, base size, size range, per-dimension increments between sizes.",
-  },
+
   {
     id: 13,
     slot: "page-13",
-    title: "HTM Guide",
+    title: "Measurement Guide",
     zhName: "度尺图",
     keywords: [
       "how to measure", "HTM", "度尺图", "measurement diagram",
@@ -172,22 +126,11 @@ export const COMPONENT_SIGNATURES = [
     description:
       "How-to-measure guide: measurement point diagrams with start/end points, general measurement criteria, red markers on garment diagrams.",
   },
-  {
-    id: 14,
-    slot: "page-14",
-    title: "Measure QA",
-    zhName: "量度QA",
-    keywords: [
-      "QA measurement", "evaluation", "actual vs target",
-      "pass/fail", "sample type", "PP", "TOP", "SIZE SET",
-    ],
-    description:
-      "QA measurement evaluation: target spec vs actual measured value, difference, tolerance, pass/fail per point. Sample type and overall result.",
-  },
+
   {
     id: 15,
     slot: "page-15",
-    title: "PP Comments",
+    title: "Approval Comment",
     zhName: "PP办评语",
     keywords: [
       "PP sample", "PP comments", "PP办评语", "sample review",
@@ -196,31 +139,8 @@ export const COMPONENT_SIGNATURES = [
     description:
       "PP sample review comments: approval status, area-specific feedback with issues and actions, defect photos, measurement comparison, bulk production notes.",
   },
-  {
-    id: 16,
-    slot: "page-16",
-    title: "Fit Photos",
-    zhName: "实物照片",
-    keywords: [
-      "fit photo", "garment photo", "mannequin", "model",
-      "front view", "back view", "实物照片", "实拍",
-    ],
-    description:
-      "Fit/garment photos: front/back/side/detail views, correct vs incorrect examples, mannequin/model size info, fit comments.",
-  },
-  {
-    id: 17,
-    slot: "page-17",
-    title: "QA Standards",
-    zhName: "质量标准",
-    keywords: [
-      "AQL", "inspection level", "critical defect", "major defect",
-      "minor defect", "testing requirement", "colorfastness",
-      "shrinkage", "质量标准",
-    ],
-    description:
-      "QA standards: AQL level, defect classification (critical/major/minor), testing requirements (wash, shrinkage, colorfastness), finishing checklist.",
-  },
+
+
   {
     id: 18,
     slot: "page-18",
@@ -234,17 +154,154 @@ export const COMPONENT_SIGNATURES = [
     description:
       "Packing details: folding method, polybag, carton specs, carton mark, barcode placement, shipment lot details with destination/qty/cartons.",
   },
+
   {
-    id: 19,
-    slot: "page-19",
-    title: "Revision History",
-    zhName: "修改记录",
+    id: 20,
+    slot: "page-20",
+    title: "Size Spec",
+    zhName: "尺码规格",
     keywords: [
-      "revision", "history", "change log", "version",
-      "carryover", "修改记录", "版本",
+      "size spec", "size specification", "size chart", "尺码规格",
+      "尺码表", "规格表", "garment measurements", "finished measurements",
+      "size breakdown", "spec sheet", "size run",
     ],
     description:
-      "Revision history: dates, versions, sections changed, descriptions, who made/approved changes, carryover notes.",
+      "Size specification table: measurement code, description, tolerance, and values for each size in the size range. Includes fit type, sample size, unit, and fabric shrinkage notes.",
+  },
+  {
+    id: 21,
+    slot: "page-21",
+    title: "Technical Team Note",
+    zhName: "技术团队备注",
+    keywords: [
+      "technical note", "team note", "technical team", "技术备注",
+      "技术团队", "工艺备注", "production note", "engineering note",
+      "tech comment", "team feedback", "internal note",
+    ],
+    description:
+      "Technical team notes and observations: categorized comments on fabric, stitching, fitting, finishing, QC. Action items with responsible persons, deadlines, and status. General remarks.",
+  },
+  {
+    id: 22,
+    slot: "page-22",
+    title: "Process Sheet",
+    zhName: "工序表",
+    keywords: [
+      "process sheet", "工序表", "工序", "process flow",
+      "operation breakdown", "SAM", "standard allowed minutes",
+      "sewing process", "process sequence", "operation list",
+      "工艺流程", "流程表",
+    ],
+    description:
+      "Process sheet: step-by-step operation breakdown with machine types, needle types, stitch types, SPI, seam allowances, time allocations, total SAM, efficiency, and operator count.",
+  },
+  {
+    id: 23,
+    slot: "page-23",
+    title: "Special Instruction",
+    zhName: "特别指示",
+    keywords: [
+      "special instruction", "特别指示", "特别要求", "special requirement",
+      "critical instruction", "注意事项", "特殊工艺", "special process",
+      "important note", "special attention", "key instruction",
+    ],
+  },
+  {
+    id: 24,
+    slot: "page-24",
+    title: "Measurement Spec",
+    zhName: "测量规格",
+    keywords: [
+      "measurement spec", "测量规格", "尺寸表", "measurement chart",
+      "spec sheet", "规格表", "measurement tolerance", "尺寸公差",
+      "garment measurements", "成衣尺寸",
+    ],
+    description:
+      "Measurement specification table: codes, descriptions, tolerances, and specific measurement values. Often includes sample size and units (cm/inch). Similar to POMs or Size Spec but focuses on detailed measurement points and tolerances.",
+  },
+  {
+    id: 25,
+    slot: "page-25",
+    title: "Properties of Order",
+    zhName: "订单属性",
+    keywords: [
+      "properties of order", "订单属性", "order properties", "order details",
+      "style info", "款号信息", "order info", "订单信息", "metadata",
+    ],
+    description:
+      "Order properties and metadata: style number, season, buyer, brand, vendor, factory, order quantity, ship date, destination, terms, and key-value attributes.",
+  },
+  {
+    id: 26,
+    slot: "page-26",
+    title: "Style Template",
+    zhName: "款式模板",
+    keywords: [
+      "style template", "款式模板", "base pattern", "design template",
+      "template reference", "款式参考",
+    ],
+    description:
+      "Style template information: template name, style reference, base pattern details, and key design elements.",
+  },
+  {
+    id: 27,
+    slot: "page-27",
+    title: "Embroidery Specification",
+    zhName: "绣花规格",
+    keywords: [
+      "embroidery", "绣花", "stitch count", "thread color",
+      "embroidery detail", "绣花要求", "applique", "贴布绣",
+    ],
+    description:
+      "Embroidery specification: details about embroidery placement, technique, dimensions, thread colors, stitch count, and backing material.",
+  },
+  {
+    id: 28,
+    slot: "page-28",
+    title: "Fabrics Consumption",
+    zhName: "面料用量",
+    keywords: [
+      "fabric consumption", "面料用量", "yield", "marker length",
+      "wastage", "cuttable width", "consumption per garment", "net yield"
+    ],
+    description:
+      "Fabric consumption: details about fabric yield, wastage, marker length, cuttable width, and material required per garment.",
+  },
+  {
+    id: 29,
+    slot: "page-29",
+    title: "Measurement Evaluation",
+    zhName: "尺寸评估",
+    keywords: [
+      "measurement evaluation", "尺寸评估", "sample evaluation", "PP evaluation",
+      "deviation", "tolerance", "pass fail", "measurement check", "actual spec"
+    ],
+    description:
+      "Measurement evaluation: details about sample measurements compared against specifications, including deviations, tolerances, and pass/fail results.",
+  },
+  {
+    id: 30,
+    slot: "page-30",
+    title: "Placement",
+    zhName: "位置",
+    keywords: [
+      "placement", "位置", "position", "distance from seam",
+      "logo placement", "print placement", "label placement"
+    ],
+    description:
+      "Placement: details about the physical location of elements (logos, labels, prints) on the garment, including dimensions and distances.",
+  },
+  {
+    id: 31,
+    slot: "page-31",
+    title: "Measurement Instruction",
+    zhName: "尺寸指示",
+    keywords: [
+      "measurement instruction", "尺寸指示", "how to measure instructions",
+      "measurement rules", "tolerance guide", "measurement details"
+    ],
+    description:
+      "Measurement instruction: detailed textual guidelines, rules, and tolerances for how measurements should be taken and verified.",
   },
 ];
 
@@ -257,7 +314,7 @@ export function buildClassificationPrompt() {
       `${c.id}. ${c.zhName} ${c.title} — ${c.description}`
   ).join("\n");
 
-  return `You are an expert garment production sheet classifier. Given one page from a factory production document, identify which of these 19 components it belongs to.
+  return `You are an expert garment production sheet classifier. Given one page from a factory production document, identify which of these 23 components it belongs to.
 
 COMPONENTS:
 ${componentList}
@@ -271,11 +328,12 @@ CLASSIFICATION RULES:
 6. If a page has PP sample comments/feedback with defect markings, it's PP Comments (#15).
 7. If a page is CLEARLY the first/cover page with brand, style#, and numbered notes, it's Cover Page (#1).
 8. If a page has BOM tables with material rows, check if it's fabric (shell/lining = #7) or trims (zipper/button/elastic = #8).
-9. If unsure between two components, return the more specific one.
+9. If a page has a full size specification table with measurement codes and values per size column but WITHOUT point-of-measure formatting, it may be Size Spec (#20) rather than POMs (#11).
+10. If unsure between two components, return the more specific one.
 
 Return ONLY valid JSON (no markdown fences):
 {
-  "componentId": <1-19>,
+  "componentId": <integer ID from the list>,
   "componentName": "<English name>",
   "confidence": <0.0 to 1.0>,
   "reasoning": "<brief explanation of why this page matches>"

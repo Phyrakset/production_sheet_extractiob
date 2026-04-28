@@ -16,7 +16,7 @@ import Comp03_TechSketch_PTCOC270_270A from './renderers/PTCOC270_270A/Comp03_Te
 import Comp01_CoverPage_PTCOM227 from './renderers/PTCOM227/Comp01_CoverPage';
 import Comp02_OrderDetails_PTCOM227 from './renderers/PTCOM227/Comp02_OrderDetails';
 import Comp03_TechSketch_PTCOM227 from './renderers/PTCOM227/Comp03_TechSketch';
-import Comp04_Construction_GPAF6153 from './renderers/GPAF6153/Comp04_Construction';
+import Comp04_Instruction_GPAF6153 from './renderers/GPAF6153/Comp04_Instruction';
 
 // ─── Component-Specific Renderers ───
 
@@ -71,11 +71,140 @@ function OrderDetailsSection({ data, extraction }) {
   );
 }
 
-function ConstructionSection({ data, extraction }) {
+function PropertiesOfOrderSection({ data, extraction }) {
+  const d = extraction?.data || data?.data || {};
+  const properties = d.properties || [];
+  return (
+    <div className="comp-section avoid-break">
+      <h2 className="comp-title">订单属性 Properties of Order</h2>
+      <div className="comp-grid-2">
+        <div className="doc-section">
+          {d.styleNumber && <p><strong>Style:</strong> {d.styleNumber}</p>}
+          {d.season && <p><strong>Season:</strong> {d.season}</p>}
+          {d.buyer && <p><strong>Buyer:</strong> {d.buyer}</p>}
+          {d.brand && <p><strong>Brand:</strong> {d.brand}</p>}
+          {d.vendor && <p><strong>Vendor:</strong> {d.vendor}</p>}
+          {d.factory && <p><strong>Factory:</strong> {d.factory}</p>}
+        </div>
+        <div className="doc-section">
+          {d.orderQuantity && <p><strong>Quantity:</strong> {d.orderQuantity}</p>}
+          {d.shipDate && <p><strong>Ship Date:</strong> {d.shipDate}</p>}
+          {d.destination && <p><strong>Destination:</strong> {d.destination}</p>}
+          {d.terms && <p><strong>Terms:</strong> {d.terms}</p>}
+        </div>
+      </div>
+      {properties.length > 0 && (
+        <table className="doc-table" style={{ marginTop: 12 }}>
+          <thead><tr><th>Property</th><th>Value</th></tr></thead>
+          <tbody>
+            {properties.map((p, i) => (
+              <tr key={i}><td>{p.key || ''}</td><td>{p.value || ''}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {d.notes?.length > 0 && <ListBlock title="Notes" items={d.notes} />}
+    </div>
+  );
+}
+
+function StyleTemplateSection({ data, extraction }) {
   const d = extraction?.data || data?.data || {};
   return (
     <div className="comp-section avoid-break">
-      <h2 className="comp-title">生产工艺 Construction</h2>
+      <h2 className="comp-title">款式模板 Style Template</h2>
+      <div className="doc-section">
+        {d.templateName && <p><strong>Template Name:</strong> {d.templateName}</p>}
+        {d.styleReference && <p><strong>Style Reference:</strong> {d.styleReference}</p>}
+        {d.basePattern && <p><strong>Base Pattern:</strong> {d.basePattern}</p>}
+      </div>
+      {d.designElements?.length > 0 && <ListBlock title="Design Elements" items={d.designElements} />}
+      {d.notes?.length > 0 && <ListBlock title="Notes" items={d.notes} />}
+    </div>
+  );
+}
+
+function EmbroiderySpecSection({ data, extraction }) {
+  const d = extraction?.data || data?.data || {};
+  return (
+    <div className="comp-section avoid-break">
+      <h2 className="comp-title">绣花规格 Embroidery Specification</h2>
+      <div className="comp-grid-2">
+        <div className="doc-section">
+          {d.placement && <p><strong>Placement:</strong> {d.placement}</p>}
+          {d.technique && <p><strong>Technique:</strong> {d.technique}</p>}
+          {d.dimensions?.width && <p><strong>Width:</strong> {d.dimensions.width}</p>}
+          {d.dimensions?.height && <p><strong>Height:</strong> {d.dimensions.height}</p>}
+        </div>
+        <div className="doc-section">
+          {d.stitchCount && <p><strong>Stitch Count:</strong> {d.stitchCount}</p>}
+          {d.backing && <p><strong>Backing:</strong> {d.backing}</p>}
+        </div>
+      </div>
+      {d.colors?.length > 0 && (
+        <table className="doc-table" style={{ marginTop: 12 }}>
+          <thead><tr><th>Color Code</th><th>Color Name</th><th>Thread Type</th></tr></thead>
+          <tbody>
+            {d.colors.map((c, i) => (
+              <tr key={i}>
+                <td>{c.colorCode || ''}</td>
+                <td>{c.colorName || ''}</td>
+                <td>{c.threadType || ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {d.notes?.length > 0 && <ListBlock title="Notes" items={d.notes} />}
+    </div>
+  );
+}
+
+function FabricsConsumptionSection({ data, extraction }) {
+  const d = extraction?.data || data?.data || {};
+  return (
+    <div className="comp-section avoid-break">
+      <h2 className="comp-title">面料用量 Fabrics Consumption</h2>
+      {d.totalGarments && <p style={{ marginBottom: 12 }}><strong>Total Garments:</strong> {d.totalGarments}</p>}
+      
+      {d.consumptions?.length > 0 && (
+        <table className="doc-table">
+          <thead>
+            <tr>
+              <th>Fabric Ref</th>
+              <th>Description</th>
+              <th>Color</th>
+              <th>Width</th>
+              <th>Cons. / Garment</th>
+              <th>Wastage</th>
+              <th>Net Yield</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.consumptions.map((c, i) => (
+              <tr key={i}>
+                <td>{c.fabricReference || ''}</td>
+                <td>{c.fabricDescription || ''}</td>
+                <td>{c.color || ''}</td>
+                <td>{c.cuttableWidth || ''}</td>
+                <td>{c.consumptionPerGarment || ''}</td>
+                <td>{c.wastagePercentage || ''}</td>
+                <td>{c.netYield || ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {d.notes?.length > 0 && <ListBlock title="Notes" items={d.notes} />}
+    </div>
+  );
+}
+
+function InstructionSection({ data, extraction }) {
+  const d = extraction?.data || data?.data || {};
+  return (
+    <div className="comp-section avoid-break">
+      <h2 className="comp-title">生产工艺 Instruction</h2>
       {d.operations?.length > 0 && (
         <table className="doc-table">
           <thead><tr><th>#</th><th>Operation</th><th>Machine/Type</th><th>SPI</th><th>Notes</th></tr></thead>
@@ -104,7 +233,7 @@ function MfgStandardsSection({ data, extraction }) {
   const d = extraction?.data || data?.data || {};
   return (
     <div className="comp-section avoid-break">
-      <h2 className="comp-title">缝制标准 Mfg Standards</h2>
+      <h2 className="comp-title">缝制标准 MFTG Standards</h2>
       {d.standards?.length > 0 && <ListBlock items={d.standards} />}
       {d.stitchRequirements?.length > 0 && <ListBlock title="Stitch Requirements" items={d.stitchRequirements} />}
       {d.sewingInstructions?.length > 0 && <ListBlock title="Sewing Instructions" items={d.sewingInstructions} />}
@@ -114,12 +243,309 @@ function MfgStandardsSection({ data, extraction }) {
   );
 }
 
+function ProcessSheetSection({ data, extraction }) {
+  const d = extraction?.data || data?.data || {};
+  const steps = d.processSteps || [];
+  return (
+    <div className="comp-section avoid-break">
+      <h2 className="comp-title">工序表 Process Sheet</h2>
+      <div className="doc-section">
+        {d.styleNumber && <p><strong>Style:</strong> {d.styleNumber}</p>}
+        {d.processTitle && <p><strong>Process:</strong> {d.processTitle}</p>}
+        {d.department && <p><strong>Department:</strong> {d.department}</p>}
+        {d.totalSAM && <p><strong>Total SAM:</strong> {d.totalSAM}</p>}
+        {d.efficiency && <p><strong>Efficiency:</strong> {d.efficiency}</p>}
+        {d.operatorCount && <p><strong>Operators:</strong> {d.operatorCount}</p>}
+      </div>
+      {steps.length > 0 ? (
+        <table className="doc-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Operation</th>
+              <th>Machine</th>
+              <th>Needle</th>
+              <th>Stitch</th>
+              <th>SPI</th>
+              <th>Seam</th>
+              <th>Time</th>
+              <th>Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            {steps.map((s, i) => (
+              <tr key={i}>
+                <td style={{ textAlign: 'center' }}>{s.stepNo || i + 1}</td>
+                <td>{s.operation || ''}</td>
+                <td>{s.machineType || ''}</td>
+                <td>{s.needleType || ''}</td>
+                <td>{s.stitchType || ''}</td>
+                <td>{s.SPI || ''}</td>
+                <td>{s.seam || ''}</td>
+                <td>{s.time || ''}</td>
+                <td>{s.remarks || ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : <p className="empty-text">No process steps data</p>}
+      {d.criticalProcesses?.length > 0 && <ListBlock title="Critical Processes" items={d.criticalProcesses} />}
+      {d.notes?.length > 0 && <ListBlock title="Notes" items={d.notes} />}
+    </div>
+  );
+}
+
+function SpecialInstructionSection({ data, extraction }) {
+  const d = extraction?.data || data?.data || {};
+  const instructions = d.instructions || [];
+  const warnings = d.warnings || [];
+  return (
+    <div className="comp-section avoid-break">
+      <h2 className="comp-title">特别指示 Special Instruction</h2>
+      <div className="doc-section">
+        {d.title && <p><strong>Title:</strong> {d.title}</p>}
+        {d.category && <p><strong>Category:</strong> {d.category}</p>}
+        {d.approvedBy && <p><strong>Approved By:</strong> {d.approvedBy}</p>}
+        {d.date && <p><strong>Date:</strong> {d.date}</p>}
+      </div>
+      {warnings.length > 0 && (
+        <div style={{ margin: '8px 0' }}>
+          {warnings.map((w, i) => (
+            <div key={i} style={{ background: w.severity === 'high' ? '#fee' : '#fff8e1', border: '1px solid ' + (w.severity === 'high' ? '#c62828' : '#f9a825'), borderRadius: 4, padding: '6px 10px', marginBottom: 4, fontSize: 13 }}>
+              <strong style={{ color: w.severity === 'high' ? '#c62828' : '#e65100' }}>⚠ {w.severity?.toUpperCase()}:</strong> {w.warning}
+            </div>
+          ))}
+        </div>
+      )}
+      {instructions.length > 0 ? (
+        <table className="doc-table">
+          <thead><tr><th>#</th><th>Area</th><th>Instruction</th><th>Priority</th><th>Details</th></tr></thead>
+          <tbody>
+            {instructions.map((inst, i) => (
+              <tr key={i} style={inst.priority === 'critical' ? { background: '#fff0f0' } : {}}>
+                <td style={{ width: 40, textAlign: 'center' }}>{inst.id || i + 1}</td>
+                <td>{inst.area || ''}</td>
+                <td>{inst.instruction || ''}</td>
+                <td style={{ color: inst.priority === 'critical' ? '#c62828' : inst.priority === 'important' ? '#e65100' : '#333', fontWeight: inst.priority === 'critical' ? 700 : 400 }}>{inst.priority || ''}</td>
+                <td>{inst.details || ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : <p className="empty-text">No special instructions</p>}
+      {d.specialRequirements?.length > 0 && <ListBlock title="Special Requirements" items={d.specialRequirements} />}
+      {d.notes?.length > 0 && <ListBlock title="Notes" items={d.notes} />}
+    </div>
+  );
+}
+
+function PlacementSection({ data, extraction }) {
+  const d = extraction?.data || data?.data || {};
+  return (
+    <div className="comp-section avoid-break">
+      <h2 className="comp-title">位置 Placement</h2>
+      {d.placementItems?.length > 0 && (
+        <table className="doc-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Position</th>
+              <th>Dimensions</th>
+              <th>Distance from Seam</th>
+              <th>Method</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.placementItems.map((item, i) => (
+              <tr key={i}>
+                <td>{item.itemName || ''}</td>
+                <td>{item.position || ''}</td>
+                <td>{item.dimensions || ''}</td>
+                <td>{item.distanceFromSeam || ''}</td>
+                <td>{item.method || ''}</td>
+                <td>{item.notes || ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {d.generalNotes?.length > 0 && <ListBlock title="General Notes" items={d.generalNotes} />}
+    </div>
+  );
+}
+
+function MeasurementEvaluationSection({ data, extraction }) {
+  const d = extraction?.data || data?.data || {};
+  return (
+    <div className="comp-section avoid-break">
+      <h2 className="comp-title">尺寸评估 Measurement Evaluation</h2>
+      <div className="comp-grid-2">
+        <div className="doc-section">
+          {d.evaluationDate && <p><strong>Date:</strong> {d.evaluationDate}</p>}
+          {d.sampleStage && <p><strong>Sample Stage:</strong> {d.sampleStage}</p>}
+        </div>
+        <div className="doc-section">
+          {d.evaluator && <p><strong>Evaluator:</strong> {d.evaluator}</p>}
+          {d.overallResult && <p><strong>Result:</strong> {d.overallResult}</p>}
+        </div>
+      </div>
+      
+      {d.measurements?.length > 0 && (
+        <table className="doc-table" style={{ marginTop: 12 }}>
+          <thead>
+            <tr>
+              <th>POM</th>
+              <th>Description</th>
+              <th>Spec</th>
+              <th>Actual</th>
+              <th>Dev.</th>
+              <th>Tol.</th>
+              <th>Pass/Fail</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.measurements.map((m, i) => (
+              <tr key={i}>
+                <td>{m.pom || ''}</td>
+                <td>{m.description || ''}</td>
+                <td>{m.spec || ''}</td>
+                <td>{m.actual || ''}</td>
+                <td>{m.deviation || ''}</td>
+                <td>{m.tolerance || ''}</td>
+                <td>{m.passFail || ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {d.comments?.length > 0 && <ListBlock title="Comments" items={d.comments} />}
+    </div>
+  );
+}
+
+function MeasurementInstructionSection({ data, extraction }) {
+  const d = extraction?.data || data?.data || {};
+  return (
+    <div className="comp-section avoid-break">
+      <h2 className="comp-title">尺寸指示 Measurement Instruction</h2>
+      {d.generalTolerances && <p style={{ marginBottom: 12 }}><strong>General Tolerances:</strong> {d.generalTolerances}</p>}
+      
+      {d.instructions?.length > 0 && (
+        <table className="doc-table">
+          <thead>
+            <tr>
+              <th style={{ width: '30%' }}>Topic</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.instructions.map((inst, i) => (
+              <tr key={i}>
+                <td><strong>{inst.topic || ''}</strong></td>
+                <td>{inst.details || ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {d.notes?.length > 0 && <ListBlock title="Notes" items={d.notes} />}
+    </div>
+  );
+}
+
+function SizeSpecSection({ data, extraction }) {
+  const d = extraction?.data || data?.data || {};
+  const specTable = d.specTable || [];
+  const sizeRange = d.sizeRange || [];
+  return (
+    <div className="comp-section avoid-break">
+      <h2 className="comp-title">尺码规格 Size Spec</h2>
+      <div className="comp-grid-2">
+        <div className="doc-section">
+          {d.styleNumber && <p><strong>Style:</strong> {d.styleNumber}</p>}
+          {d.sampleSize && <p><strong>Sample Size:</strong> {d.sampleSize}</p>}
+          {d.fitType && <p><strong>Fit Type:</strong> {d.fitType}</p>}
+          {d.unit && <p><strong>Unit:</strong> {d.unit}</p>}
+          {d.fabricShrinkage && <p><strong>Shrinkage:</strong> {d.fabricShrinkage}</p>}
+        </div>
+      </div>
+      {specTable.length > 0 ? (
+        <table className="doc-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Description</th>
+              <th>Tol.</th>
+              {sizeRange.map(s => <th key={s}>{s}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {specTable.map((row, i) => (
+              <tr key={i}>
+                <td>{row.code || ''}</td>
+                <td>{row.description || ''}</td>
+                <td>{row.tolerance || ''}</td>
+                {sizeRange.map(s => <td key={s}>{row.sizes?.[s] ?? ''}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : <p className="empty-text">No size spec data</p>}
+      {d.notes?.length > 0 && <ListBlock title="Notes" items={d.notes} />}
+    </div>
+  );
+}
+
+function MeasurementSpecSection({ data, extraction }) {
+  const d = extraction?.data || data?.data || {};
+  const specs = d.specifications || [];
+  return (
+    <div className="comp-section avoid-break">
+      <h2 className="comp-title">测量规格 Measurement Spec</h2>
+      <div className="comp-grid-2">
+        <div className="doc-section">
+          {d.styleNumber && <p><strong>Style:</strong> {d.styleNumber}</p>}
+          {d.title && <p><strong>Title:</strong> {d.title}</p>}
+          {d.sampleSize && <p><strong>Sample Size:</strong> {d.sampleSize}</p>}
+          {d.unit && <p><strong>Unit:</strong> {d.unit}</p>}
+        </div>
+      </div>
+      {specs.length > 0 ? (
+        <table className="doc-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Description</th>
+              <th>Tol.</th>
+              <th>Measurement</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {specs.map((row, i) => (
+              <tr key={i}>
+                <td>{row.code || ''}</td>
+                <td>{row.description || ''}</td>
+                <td>{row.tolerance || ''}</td>
+                <td>{row.measurement || ''}</td>
+                <td>{row.notes || ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : <p className="empty-text">No measurement spec data</p>}
+      {d.remarks?.length > 0 && <ListBlock title="Remarks" items={d.remarks} />}
+    </div>
+  );
+}
+
 function POMsSection({ data, extraction }) {
   const d = extraction?.data || data?.data || {};
   const measurements = d.measurements || d.pointsOfMeasure || [];
   return (
     <div className="comp-section avoid-break">
-      <h2 className="comp-title">成品尺寸 POMs</h2>
+      <h2 className="comp-title">成品尺寸 POMs Measurement</h2>
       {measurements.length > 0 ? (
         <table className="doc-table">
           <thead>
@@ -203,6 +629,58 @@ function PackagingSection({ data, extraction }) {
   );
 }
 
+function TechnicalTeamNoteSection({ data, extraction }) {
+  const d = extraction?.data || data?.data || {};
+  const notes = d.notes || [];
+  const actionItems = d.actionItems || [];
+  return (
+    <div className="comp-section avoid-break">
+      <h2 className="comp-title">技术团队备注 Technical Team Note</h2>
+      <div className="doc-section">
+        {d.teamName && <p><strong>Team:</strong> {d.teamName}</p>}
+        {d.date && <p><strong>Date:</strong> {d.date}</p>}
+        {d.subject && <p><strong>Subject:</strong> {d.subject}</p>}
+      </div>
+      {notes.length > 0 && (
+        <table className="doc-table">
+          <thead><tr><th>#</th><th>Category</th><th>Note</th><th>Priority</th><th>Assignee</th></tr></thead>
+          <tbody>
+            {notes.map((n, i) => (
+              <tr key={i}>
+                <td style={{ width: 40, textAlign: 'center' }}>{i + 1}</td>
+                <td>{n.category || ''}</td>
+                <td>{n.content || (typeof n === 'string' ? n : JSON.stringify(n))}</td>
+                <td>{n.priority || ''}</td>
+                <td>{n.assignee || ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {actionItems.length > 0 && (
+        <>
+          <h4 style={{ margin: '12px 0 6px', fontSize: 13, fontWeight: 700, color: '#555' }}>Action Items</h4>
+          <table className="doc-table">
+            <thead><tr><th>#</th><th>Item</th><th>Responsible</th><th>Deadline</th><th>Status</th></tr></thead>
+            <tbody>
+              {actionItems.map((a, i) => (
+                <tr key={i}>
+                  <td style={{ width: 40, textAlign: 'center' }}>{i + 1}</td>
+                  <td>{a.item || ''}</td>
+                  <td>{a.responsible || ''}</td>
+                  <td>{a.deadline || ''}</td>
+                  <td>{a.status || ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      {d.generalRemarks?.length > 0 && <ListBlock title="General Remarks" items={d.generalRemarks} />}
+    </div>
+  );
+}
+
 function GenericSection({ data, extraction, slotTitle }) {
   const d = extraction?.data || data?.data || {};
   const notes = d.notes || [];
@@ -277,12 +755,24 @@ function ListBlock({ title, items }) {
 const COMPONENT_MAP = {
   'Cover Page':       GenericSection,
   'Order Details':   OrderDetailsSection,
-  'Construction':    ConstructionSection,
-  'Mfg Standards':   MfgStandardsSection,
-  'POMs':            POMsSection,
+  'Properties of Order': PropertiesOfOrderSection,
+  'Style Template':  StyleTemplateSection,
+  'Instruction':    InstructionSection,
+  'Placement':      PlacementSection,
+  'MFTG Standards':   MfgStandardsSection,
+  'Process Sheet':   ProcessSheetSection,
+  'Special Instruction': SpecialInstructionSection,
+  'POMs Measurement':            POMsSection,
+  'Size Spec':       SizeSpecSection,
+  'Measurement Spec': MeasurementSpecSection,
+  'Measurement Evaluation': MeasurementEvaluationSection,
+  'Measurement Instruction': MeasurementInstructionSection,
   'BOM Fabrics':     (props) => <BOMSection {...props} title="面料物料 BOM Fabrics" />,
-  'BOM Trims':       (props) => <BOMSection {...props} title="辅料 BOM Trims" />,
+  'Fabrics Consumption': FabricsConsumptionSection,
+  'Multi-level Placements':       (props) => <BOMSection {...props} title="辅料 Multi-level Placements" />,
+  'Embroidery Specification': EmbroiderySpecSection,
   'Packaging':       PackagingSection,
+  'Technical Team Note': TechnicalTeamNoteSection,
 };
 
 // ─── Main MasterDocument Component ───
@@ -407,9 +897,9 @@ export default function MasterDocument({ masterData, slotResults, onClose }) {
             } else if (styleId === 'PTCOM227' || factoryNumber.includes('PTCOM227') || docFactory.includes('PTCOM227') || custStyle.includes('3AFESHSP1') || result?.fileName?.includes('PTCOM227') || JSON.stringify(extraction).includes('PTCOM227')) {
               Renderer = Comp03_TechSketch_PTCOM227;
             }
-          } else if (slotTitle === 'Construction' || slotTitle === 'Mfg Standards' || slotTitle === 'Production Instructions') {
+          } else if (slotTitle === 'Instruction' || slotTitle === 'MFTG Standards' || slotTitle === 'Production Instructions') {
             if (styleId === 'GPAF6153' || factoryNumber === 'GPAF6153' || docFactory === 'GPAF6153' || docStyle === 'GPAF6153' || result?.fileName?.includes('GPAF6153')) {
-              Renderer = Comp04_Construction_GPAF6153;
+              Renderer = Comp04_Instruction_GPAF6153;
             }
           }
           
